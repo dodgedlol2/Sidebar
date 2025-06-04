@@ -1,8 +1,15 @@
 import streamlit as st
 import streamlit_antd_components as sac
-from st_on_hover_tabs import on_hover_tabs
 import pandas as pd
 import numpy as np
+
+# Try to import hover tabs with error handling
+try:
+    from st_on_hover_tabs import on_hover_tabs
+    HOVER_TABS_AVAILABLE = True
+except ImportError:
+    HOVER_TABS_AVAILABLE = False
+    st.error("❌ streamlit-on-Hover-tabs not available. Install with: pip install streamlit-on-Hover-tabs")
 
 # Configure page settings
 st.set_page_config(
@@ -12,15 +19,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling
+# Custom CSS for styling and hover tabs
 st.markdown("""
 <style>
-/* Custom styles for hover tabs */
-.css-1d391kg {
-    background-color: #0e1117;
+/* Import Google Fonts for icons */
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+/* Hover tabs styling fallback */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 2px;
 }
 
-/* Separator styling */
+.stTabs [data-baseweb="tab"] {
+    height: 50px;
+    padding-left: 20px;
+    padding-right: 20px;
+    background-color: #f0f2f6;
+    border-radius: 4px 4px 0px 0px;
+    gap: 1px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #4CAF50;
+    color: white;
+}
+
+/* Custom styles */
 .nav-separator {
     margin: 1rem 0;
     padding: 0.5rem 0;
@@ -35,6 +61,15 @@ st.markdown("""
     letter-spacing: 1px;
     margin: 1rem 0 0.5rem 0;
 }
+
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    margin: 0.5rem 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,25 +81,44 @@ if 'sub_navigation' not in st.session_state:
 
 # Main header
 st.title("🎯 Hybrid Navigation Demo")
-st.markdown("*Combining Hover Tabs + Antd Components for Ultimate Navigation*")
+if HOVER_TABS_AVAILABLE:
+    st.markdown("*✅ Combining Hover Tabs + Antd Components for Ultimate Navigation*")
+else:
+    st.markdown("*⚠️ Using Streamlit Tabs + Antd Components (Hover tabs unavailable)*")
 
-# Sidebar with BOTH navigation systems
+# Sidebar with navigation
 with st.sidebar:
     st.title("🚀 Navigation Hub")
     
-    # PRIMARY NAVIGATION - Using Hover Tabs
+    # PRIMARY NAVIGATION
     st.markdown('<div class="section-header">Main Sections</div>', unsafe_allow_html=True)
     
-    main_tabs = on_hover_tabs(
-        tabName=['Dashboard', 'Analytics', 'Products', 'Reports', 'Settings'],
-        iconName=['dashboard', 'bar_chart', 'inventory_2', 'description', 'settings'],
-        default_choice=0,
-        key="main_navigation"
-    )
+    if HOVER_TABS_AVAILABLE:
+        # Use hover tabs if available
+        try:
+            main_tabs = on_hover_tabs(
+                tabName=['Dashboard', 'Analytics', 'Products', 'Reports', 'Settings'],
+                iconName=['dashboard', 'bar_chart', 'inventory_2', 'description', 'settings'],
+                default_choice=0,
+                key="main_navigation"
+            )
+            
+            if main_tabs:
+                st.session_state.main_section = main_tabs
+        except Exception as e:
+            st.error(f"Hover tabs error: {e}")
+            HOVER_TABS_AVAILABLE = False
     
-    # Update main section
-    if main_tabs:
-        st.session_state.main_section = main_tabs
+    if not HOVER_TABS_AVAILABLE:
+        # Fallback to regular selectbox
+        main_sections = ['Dashboard', 'Analytics', 'Products', 'Reports', 'Settings']
+        selected_section = st.selectbox(
+            "Choose Section:",
+            main_sections,
+            index=main_sections.index(st.session_state.main_section) if st.session_state.main_section in main_sections else 0,
+            key="main_section_select"
+        )
+        st.session_state.main_section = selected_section
     
     # SEPARATOR
     st.markdown('<div class="nav-separator"></div>', unsafe_allow_html=True)
@@ -85,7 +139,8 @@ with st.sidebar:
             ]),
         ], open_all=True, key='dashboard_menu')
         
-        st.session_state.sub_navigation = dashboard_menu
+        if dashboard_menu:
+            st.session_state.sub_navigation = dashboard_menu
     
     elif st.session_state.main_section == 'Analytics':
         # Analytics-specific antd navigation
@@ -104,7 +159,8 @@ with st.sidebar:
             ]),
         ], open_all=True, key='analytics_menu')
         
-        st.session_state.sub_navigation = analytics_menu
+        if analytics_menu:
+            st.session_state.sub_navigation = analytics_menu
     
     elif st.session_state.main_section == 'Products':
         # Products-specific antd navigation
@@ -124,7 +180,8 @@ with st.sidebar:
             ]),
         ], open_all=True, key='products_menu')
         
-        st.session_state.sub_navigation = products_menu
+        if products_menu:
+            st.session_state.sub_navigation = products_menu
     
     elif st.session_state.main_section == 'Reports':
         # Reports-specific antd navigation
@@ -143,7 +200,8 @@ with st.sidebar:
             ]),
         ], open_all=True, key='reports_menu')
         
-        st.session_state.sub_navigation = reports_menu
+        if reports_menu:
+            st.session_state.sub_navigation = reports_menu
     
     else:  # Settings
         # Settings-specific antd navigation
@@ -162,7 +220,8 @@ with st.sidebar:
             ]),
         ], open_all=True, key='settings_menu')
         
-        st.session_state.sub_navigation = settings_menu
+        if settings_menu:
+            st.session_state.sub_navigation = settings_menu
     
     # ADDITIONAL ANTD COMPONENTS
     st.markdown('<div class="nav-separator"></div>', unsafe_allow_html=True)
@@ -197,16 +256,16 @@ def render_dashboard_content():
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Users", "1,234", "12%")
-            sac.tag("Active", color='green')
+            st.write(sac.Tag("Active", color='green'))
         with col2:
             st.metric("Revenue", "$45,678", "8%")
-            sac.tag("Growing", color='blue')
+            st.write(sac.Tag("Growing", color='blue'))
         with col3:
             st.metric("Orders", "567", "-2%")
-            sac.tag("Monitor", color='orange')
+            st.write(sac.Tag("Monitor", color='orange'))
         with col4:
             st.metric("Conversion", "3.2%", "0.8%")
-            sac.tag("Optimizing", color='purple')
+            st.write(sac.Tag("Optimizing", color='purple'))
     
     elif current_sub == 'metrics':
         st.title("📊 Live Metrics")
@@ -256,8 +315,9 @@ def render_dashboard_content():
             "5 new user registrations"
         ]
         
-        for activity in activities:
-            sac.tag(activity, color='blue')
+        for i, activity in enumerate(activities):
+            st.write(f"{i+1}. {activity}")
+            st.write(sac.Tag(f"Activity {i+1}", color='blue'))
             st.write("")
     
     else:
@@ -344,7 +404,7 @@ def render_products_content():
             with cols[i % 3]:
                 st.image("https://via.placeholder.com/150", width=150)
                 st.write(f"{current_sub.title()} Product {i+1}")
-                sac.tag(f"${np.random.randint(10, 100)}", color='green')
+                st.write(sac.Tag(f"${np.random.randint(10, 100)}", color='green'))
     
     else:
         st.title(f"📦 {current_sub.title()}")
@@ -451,4 +511,4 @@ with col4:
 if quick_action:
     st.info(f"Quick action triggered: {quick_action}")
 
-st.markdown("*🎯 Hybrid Navigation: Hover Tabs + Antd Components*")
+st.markdown("*🎯 Hybrid Navigation: Best of Both Worlds*")
