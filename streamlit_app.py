@@ -3,142 +3,309 @@ import streamlit_antd_components as sac
 import streamlit_authenticator as stauth
 import pandas as pd
 import numpy as np
-import yaml
-from yaml.loader import SafeLoader
+import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime, timedelta
+import requests
+import time
 
 # Configure page settings
 st.set_page_config(
-    page_title="Secure Professional Dashboard",
-    page_icon="🔐",
+    page_title="Kaspa Analytics Pro",
+    page_icon="💎",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Load authentication configuration
+# Authentication configuration
 @st.cache_data
-def load_config():
-    """Load authentication configuration from YAML file"""
-    # You can also define this directly in code for testing
+def load_auth_config():
+    """Load authentication configuration"""
     config = {
         'credentials': {
             'usernames': {
                 'admin': {
-                    'email': 'admin@company.com',
+                    'email': 'admin@kaspalytics.com',
                     'first_name': 'Admin',
                     'last_name': 'User',
-                    'password': 'admin123'  # Plain text - will be hashed by authenticator
+                    'password': 'admin123',
+                    'subscription': 'pro'
                 },
-                'jsmith': {
-                    'email': 'john.smith@company.com',
-                    'first_name': 'John',
-                    'last_name': 'Smith',
-                    'password': 'user123'  # Plain text - will be hashed by authenticator
+                'premium_user': {
+                    'email': 'premium@example.com',
+                    'first_name': 'Premium',
+                    'last_name': 'User',
+                    'password': 'premium123',
+                    'subscription': 'premium'
                 },
-                'mwilson': {
-                    'email': 'mary.wilson@company.com',
-                    'first_name': 'Mary',
-                    'last_name': 'Wilson',
-                    'password': 'mary456'  # Plain text - will be hashed by authenticator
+                'free_user': {
+                    'email': 'free@example.com',
+                    'first_name': 'Free',
+                    'last_name': 'User',
+                    'password': 'free123',
+                    'subscription': 'free'
                 }
             }
         },
         'cookie': {
-            'name': 'dashboard_auth_cookie',
-            'key': 'your_secret_random_key_12345',  # Change this to a random secret key
+            'name': 'kaspa_analytics_auth',
+            'key': 'kaspa_secret_key_12345',
             'expiry_days': 30
         },
-        'preauthorized': [
-            'admin@company.com',
-            'new.user@company.com'
-        ]
+        'preauthorized': ['admin@kaspalytics.com']
     }
     return config
 
-# Initialize authenticator with auto_hash=True
-config = load_config()
+# Initialize authenticator
+config = load_auth_config()
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
     config['cookie']['key'],
     config['cookie']['expiry_days'],
     config['preauthorized'],
-    auto_hash=True  # This will automatically hash plain text passwords
+    auto_hash=True
 )
 
-# Custom CSS for better styling
+# Custom CSS for Kaspa theme
 st.markdown("""
 <style>
-/* Main styling */
-.main-header {
-    padding: 1rem 0 2rem 0;
-    border-bottom: 2px solid #f0f2f6;
-    margin-bottom: 2rem;
+/* Kaspa-themed styling */
+:root {
+    --kaspa-blue: #70C7BA;
+    --kaspa-dark: #1a1a1a;
+    --kaspa-light: #f8f9fa;
+    --kaspa-accent: #49A097;
 }
 
-.content-section {
+.main-header {
+    background: linear-gradient(135deg, var(--kaspa-blue) 0%, var(--kaspa-accent) 100%);
+    padding: 2rem;
+    border-radius: 12px;
+    color: white;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 1.5rem;
     border-radius: 12px;
-    background: #f8f9fa;
-    margin: 1rem 0;
-    border: 1px solid #e9ecef;
-}
-
-.sidebar-section {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-    margin: 1rem 0;
-    border-left: 4px solid #4CAF50;
-}
-
-.status-bar {
-    background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
     color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    margin: 1rem 0;
-}
-
-/* Auth styling */
-.auth-container {
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 2rem;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e9ecef;
-}
-
-.user-info {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 1rem;
-    border-radius: 8px;
+    text-align: center;
     margin: 0.5rem 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.premium-badge {
+    background: linear-gradient(45deg, #FFD700, #FFA500);
+    color: #000;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.pro-badge {
+    background: linear-gradient(45deg, #8A2BE2, #4B0082);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.free-badge {
+    background: #gray;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.paywall-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.data-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Login function
-def show_login_page():
-    """Display the login page with antd components"""
+# Kaspa data fetching functions
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def fetch_kaspa_price_data():
+    """Fetch Kaspa price data from API"""
+    try:
+        # Using CoinGecko API for demo (replace with real Kaspa API)
+        url = "https://api.coingecko.com/api/v3/coins/kaspa/market_chart"
+        params = {"vs_currency": "usd", "days": "365"}
+        response = requests.get(url, params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Convert to DataFrame
+            prices = data['prices']
+            volumes = data['total_volumes']
+            
+            df = pd.DataFrame(prices, columns=['timestamp', 'price'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df['volume'] = [vol[1] for vol in volumes]
+            
+            return df
+        else:
+            # Fallback: Generate synthetic data for demo
+            return generate_synthetic_kaspa_data()
+            
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
+        return generate_synthetic_kaspa_data()
+
+def generate_synthetic_kaspa_data():
+    """Generate synthetic Kaspa data for demo purposes"""
+    dates = pd.date_range(start='2022-01-01', end=datetime.now(), freq='D')
     
+    # Generate price data with some realistic patterns
+    np.random.seed(42)
+    base_price = 0.02
+    prices = []
+    current_price = base_price
+    
+    for i in range(len(dates)):
+        # Add trend and volatility
+        trend = 0.001 * np.sin(i / 50) + 0.0005
+        volatility = np.random.normal(0, 0.05)
+        current_price *= (1 + trend + volatility)
+        prices.append(max(current_price, 0.001))  # Ensure positive prices
+    
+    volumes = np.random.lognormal(15, 1, len(dates))
+    
+    df = pd.DataFrame({
+        'timestamp': dates,
+        'price': prices,
+        'volume': volumes
+    })
+    
+    return df
+
+@st.cache_data
+def calculate_power_law_metrics(df, subscription_level):
+    """Calculate power law analysis metrics"""
+    if subscription_level == 'free':
+        # Free users get basic power law data
+        return calculate_basic_power_law(df)
+    else:
+        # Premium users get advanced analysis
+        return calculate_advanced_power_law(df)
+
+def calculate_basic_power_law(df):
+    """Basic power law calculation for free users"""
+    # Simple power law regression
+    df = df.copy()
+    df['days_since_start'] = (df['timestamp'] - df['timestamp'].min()).dt.days + 1
+    df['log_price'] = np.log(df['price'])
+    df['log_days'] = np.log(df['days_since_start'])
+    
+    # Simple linear regression for log-log plot
+    coeffs = np.polyfit(df['log_days'], df['log_price'], 1)
+    df['power_law_fit'] = np.exp(coeffs[1]) * (df['days_since_start'] ** coeffs[0])
+    
+    return df, coeffs
+
+def calculate_advanced_power_law(df):
+    """Advanced power law analysis for premium users"""
+    df, basic_coeffs = calculate_basic_power_law(df)
+    
+    # Add advanced metrics
+    df['price_deviation'] = (df['price'] - df['power_law_fit']) / df['power_law_fit']
+    df['rolling_correlation'] = df['price'].rolling(30).corr(df['power_law_fit'])
+    
+    # Calculate support and resistance levels
+    df['support_level'] = df['power_law_fit'] * 0.5
+    df['resistance_level'] = df['power_law_fit'] * 2.0
+    
+    # Advanced coefficients with confidence intervals
+    advanced_metrics = {
+        'slope': basic_coeffs[0],
+        'intercept': basic_coeffs[1],
+        'r_squared': np.corrcoef(df['log_days'], df['log_price'])[0, 1] ** 2,
+        'current_deviation': df['price_deviation'].iloc[-1],
+        'avg_deviation': df['price_deviation'].mean()
+    }
+    
+    return df, advanced_metrics
+
+def get_user_subscription(username):
+    """Get user subscription level"""
+    user_config = config['credentials']['usernames'].get(username, {})
+    return user_config.get('subscription', 'free')
+
+def show_paywall(feature_name, required_tier):
+    """Display paywall for premium features"""
+    st.markdown('<div class="paywall-container">', unsafe_allow_html=True)
+    st.markdown(f"## 🔒 {feature_name}")
+    st.markdown(f"This feature requires a **{required_tier.title()}** subscription.")
+    st.markdown("### Upgrade to unlock:")
+    
+    if required_tier == 'premium':
+        benefits = [
+            "📊 Advanced Power Law Analysis",
+            "📈 Full Historical Data Access",
+            "💾 Data Export Capabilities", 
+            "🔔 Real-time Alerts",
+            "📑 Custom Reports"
+        ]
+    else:  # pro
+        benefits = [
+            "🔬 Research-Grade Analysis",
+            "🤖 API Access",
+            "👨‍💼 Priority Support",
+            "🎯 Custom Indicators",
+            "📊 White-label Reports"
+        ]
+    
+    for benefit in benefits:
+        st.markdown(f"- {benefit}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(f"Upgrade to {required_tier.title()}", type="primary"):
+            st.success("Redirecting to payment page... (Demo)")
+    with col2:
+        if st.button("Learn More"):
+            st.info("More information about pricing and features.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_login_page():
+    """Display login page"""
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    st.title("🔐 Secure Dashboard Login")
-    st.markdown("*Please log in to access your professional dashboard*")
+    st.title("💎 Kaspa Analytics Pro")
+    st.markdown("*Professional Kaspa blockchain analysis and research platform*")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Login form in center
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Login to Access Analytics")
         
-        # Login widget - Use the correct modern syntax
+        # Login widget
         authenticator.login()
         
-        # Get authentication status from session state
+        # Get authentication status
         name = st.session_state.get('name')
         authentication_status = st.session_state.get('authentication_status')
         username = st.session_state.get('username')
@@ -146,461 +313,427 @@ def show_login_page():
         if authentication_status == False:
             st.error("❌ Username/password is incorrect. Please try again.")
         elif authentication_status == None:
-            st.info("ℹ️ Please enter your username and password to continue.")
+            st.info("ℹ️ Please enter your credentials to access the platform.")
         
-        # Demo credentials info
+        # Demo credentials
         st.markdown("---")
-        st.markdown("**🔑 Demo Credentials:**")
+        st.markdown("**🔑 Demo Accounts:**")
         
-        demo_creds = sac.tabs([
-            sac.TabsItem(label='Admin', icon='person-gear'),
-            sac.TabsItem(label='User 1', icon='person'),
-            sac.TabsItem(label='User 2', icon='person'),
-        ], index=0, key='demo_creds_tabs')
+        demo_tabs = sac.tabs([
+            sac.TabsItem(label='Free Tier', icon='person'),
+            sac.TabsItem(label='Premium', icon='star'),
+            sac.TabsItem(label='Pro', icon='crown'),
+        ], index=0, key='demo_accounts')
         
-        if demo_creds == 'Admin':
-            st.code("Username: admin\nPassword: admin123")
-        elif demo_creds == 'User 1':
-            st.code("Username: jsmith\nPassword: user123")
+        if demo_tabs == 'Free Tier':
+            st.code("Username: free_user\nPassword: free123\nAccess: Basic charts and data")
+        elif demo_tabs == 'Premium':
+            st.code("Username: premium_user\nPassword: premium123\nAccess: Advanced analytics")
         else:
-            st.code("Username: mwilson\nPassword: mary456")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.code("Username: admin\nPassword: admin123\nAccess: Full platform access")
     
     return name, authentication_status, username
 
 def show_main_app(name, username):
-    """Display the main authenticated application"""
+    """Display main application"""
+    subscription_level = get_user_subscription(username)
     
-    # Initialize session state for navigation
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = 'home'
-    
-    # Main header with user info
+    # Header with user info
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
-        st.title("🚀 Professional Dashboard")
-        st.markdown(f"*Welcome back, **{name}**! You're logged in as **{username}***")
+        st.markdown("# 💎 Kaspa Analytics Pro")
+        st.markdown("*Professional blockchain analysis platform*")
     
     with col2:
-        st.markdown('<div class="user-info">', unsafe_allow_html=True)
-        st.markdown(f"**👤 {name}**")
-        st.markdown(f"🏷️ @{username}")
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(f"**Welcome, {name}!**")
+        if subscription_level == 'free':
+            st.markdown('<span class="free-badge">FREE USER</span>', unsafe_allow_html=True)
+        elif subscription_level == 'premium':
+            st.markdown('<span class="premium-badge">PREMIUM</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span class="pro-badge">PRO</span>', unsafe_allow_html=True)
+    
+    with col3:
+        if st.button("🚪 Logout", type="secondary"):
+            authenticator.logout()
+            st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Sidebar with navigation and user controls
+    # Sidebar navigation
     with st.sidebar:
-        # User info section
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown(f"**👋 Welcome, {name.split()[0]}!**")
-        st.markdown(f"Logged in as: **{username}**")
+        st.title("📊 Analytics Menu")
         
-        # Logout button
-        if st.button("🚪 Logout", type="secondary", use_container_width=True):
-            # Use authenticator logout
-            authenticator.logout()
-            st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.title("🎯 Navigation")
-        
-        # Role-based navigation (example)
-        user_role = "admin" if username == "admin" else "user"
-        
-        if user_role == "admin":
-            # Admin gets full access
+        # Navigation based on subscription level
+        if subscription_level == 'free':
             menu_items = [
-                sac.MenuItem('home', icon='house-fill', tag=[
-                    sac.Tag('Main', color='blue'),
-                    sac.Tag('Admin', color='red')
-                ]),
-                
-                sac.MenuItem('analytics', icon='bar-chart-fill', children=[
-                    sac.MenuItem('overview', icon='speedometer2', description='Key metrics dashboard'),
-                    sac.MenuItem('reports', icon='file-earmark-text', description='Detailed reports'),
-                    sac.MenuItem('users', icon='people', description='User analytics'),
-                    sac.MenuItem('sales', icon='currency-dollar', description='Sales data'),
-                    sac.MenuItem('traffic', icon='graph-up', description='Website traffic'),
-                ]),
-                
-                sac.MenuItem('products', icon='box-fill', children=[
-                    sac.MenuItem('catalog', icon='grid', tag=sac.Tag('1.2k', color='orange')),
-                    sac.MenuItem('categories', icon='tags'),
-                    sac.MenuItem('inventory', icon='boxes', description='Stock management'),
-                    sac.MenuItem('suppliers', icon='truck', description='Supplier network'),
-                ]),
-                
-                sac.MenuItem('customers', icon='people-fill', children=[
-                    sac.MenuItem('customer_list', icon='person-lines-fill'),
-                    sac.MenuItem('segments', icon='diagram-3'),
-                    sac.MenuItem('support', icon='headset', tag=sac.Tag('24/7', color='red')),
-                ]),
-                
-                sac.MenuItem('admin', icon='shield-check', children=[
-                    sac.MenuItem('user_management', icon='people-fill', description='Manage users'),
-                    sac.MenuItem('system_settings', icon='gear-fill', description='System configuration'),
-                    sac.MenuItem('audit_logs', icon='journal-text', description='System logs'),
-                    sac.MenuItem('backup', icon='cloud-arrow-up', description='Data backup'),
-                ]),
-                
+                sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Free', color='gray')),
+                sac.MenuItem('price_charts', icon='graph-up', description='Basic price data'),
+                sac.MenuItem('power_law_basic', icon='bar-chart', description='Simple power law'),
                 sac.MenuItem(type='divider'),
-                
-                sac.MenuItem('settings', icon='sliders'),
-                sac.MenuItem('help', icon='question-circle-fill'),
+                sac.MenuItem('upgrade', icon='star', tag=sac.Tag('Upgrade', color='orange')),
             ]
-        else:
-            # Regular users get limited access
+        elif subscription_level == 'premium':
             menu_items = [
-                sac.MenuItem('home', icon='house-fill', tag=sac.Tag('Main', color='blue')),
-                
-                sac.MenuItem('analytics', icon='bar-chart-fill', children=[
-                    sac.MenuItem('overview', icon='speedometer2', description='Key metrics dashboard'),
-                    sac.MenuItem('reports', icon='file-earmark-text', description='Your reports'),
+                sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Premium', color='gold')),
+                sac.MenuItem('price_charts', icon='graph-up'),
+                sac.MenuItem('advanced_analytics', icon='bar-chart-fill', children=[
+                    sac.MenuItem('power_law_advanced', icon='trending-up', description='Advanced power law'),
+                    sac.MenuItem('network_metrics', icon='diagram-3', description='Network analysis'),
+                    sac.MenuItem('correlation_analysis', icon='arrow-left-right'),
                 ]),
-                
-                sac.MenuItem('products', icon='box-fill', children=[
-                    sac.MenuItem('catalog', icon='grid', description='View catalog'),
-                    sac.MenuItem('categories', icon='tags', description='Browse categories'),
+                sac.MenuItem('data_export', icon='download', description='Export data'),
+                sac.MenuItem('alerts', icon='bell', description='Price alerts'),
+                sac.MenuItem(type='divider'),
+                sac.MenuItem('upgrade_pro', icon='crown', tag=sac.Tag('Pro', color='purple')),
+            ]
+        else:  # pro
+            menu_items = [
+                sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Pro', color='purple')),
+                sac.MenuItem('price_charts', icon='graph-up'),
+                sac.MenuItem('advanced_analytics', icon='bar-chart-fill', children=[
+                    sac.MenuItem('power_law_advanced', icon='trending-up'),
+                    sac.MenuItem('network_metrics', icon='diagram-3'),
+                    sac.MenuItem('correlation_analysis', icon='arrow-left-right'),
+                    sac.MenuItem('custom_indicators', icon='sliders'),
                 ]),
-                
-                sac.MenuItem('profile', icon='person-circle', description='Your profile'),
-                sac.MenuItem('help', icon='question-circle-fill'),
+                sac.MenuItem('research', icon='book', children=[
+                    sac.MenuItem('power_law_research', icon='graph-up-arrow', description='Your research'),
+                    sac.MenuItem('reports', icon='file-earmark-text'),
+                    sac.MenuItem('api_access', icon='code-square'),
+                ]),
+                sac.MenuItem('data_export', icon='download'),
+                sac.MenuItem('alerts', icon='bell'),
+                sac.MenuItem(type='divider'),
+                sac.MenuItem('settings', icon='gear'),
             ]
         
-        # Main navigation menu
         selected = sac.menu(menu_items, open_all=True, key='main_menu')
         
-        # Update session state
-        if selected:
-            st.session_state.current_page = selected
+        # Quick stats sidebar
+        st.markdown("---")
+        st.markdown("**⚡ Quick Stats**")
         
-        # Quick actions section
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown("**⚡ Quick Actions**")
-        
-        quick_action = sac.buttons([
-            sac.ButtonsItem(label='Export Data', icon='download'),
-            sac.ButtonsItem(label='Refresh', icon='arrow-clockwise'),
-            sac.ButtonsItem(label='Profile', icon='person'),
-        ], index=None, format_func='title', align='center', key='quick_buttons')
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Preferences section
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown("**🎛️ Preferences**")
-        
-        dark_mode = sac.switch(label='Dark Mode', value=False, key='dark_mode_switch')
-        auto_refresh = sac.switch(label='Auto Refresh', value=True, key='auto_refresh_switch')
-        notifications = sac.switch(label='Notifications', value=True, key='notifications_switch')
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Status section
-        st.markdown('<div class="status-bar">', unsafe_allow_html=True)
-        st.markdown(f"**📊 Status: Online | Role: {user_role.title()}**")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Content rendering based on user role and selection
-    current_page = st.session_state.current_page
-    
-    # Route to appropriate content with role checking
-    if current_page == 'home':
-        render_home(name, username, user_role)
-    elif current_page == 'overview':
-        render_analytics_overview(user_role)
-    elif current_page == 'catalog':
-        render_product_catalog(user_role)
-    elif current_page == 'user_management' and user_role == 'admin':
-        render_user_management()
-    elif current_page == 'system_settings' and user_role == 'admin':
-        render_system_settings()
-    elif current_page == 'audit_logs' and user_role == 'admin':
-        render_audit_logs()
-    elif current_page == 'profile':
-        render_user_profile(name, username)
-    elif current_page in ['reports', 'users', 'sales', 'traffic', 'categories', 'inventory', 'suppliers', 'customer_list', 'segments', 'support', 'backup', 'settings', 'help']:
-        render_generic_page(current_page, user_role)
-    else:
-        render_home(name, username, user_role)
-    
-    # Footer with user and system info
-    st.markdown("---")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(f"**👤 User:** {name}")
-    with col2:
-        st.markdown(f"**📍 Page:** {current_page.replace('_', ' ').title()}")
-    with col3:
-        st.markdown(f"**🛡️ Role:** {user_role.title()}")
-    with col4:
-        st.markdown(f"**🔔 Notifications:** {'✅' if notifications else '❌'}")
-    
-    # Show quick action feedback
-    if quick_action:
-        if quick_action == 'Profile':
-            st.session_state.current_page = 'profile'
-            st.rerun()
-        else:
-            st.success(f"✅ Quick action executed: **{quick_action}**")
-
-# Content rendering functions
-def render_home(name, username, user_role):
-    """Render the home dashboard with user-specific content"""
-    
-    st.title("🏠 Dashboard Home")
-    
-    # Welcome section with user info
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader(f"Welcome back, {name.split()[0]}! 👋")
-        st.write(f"You're logged in as **{username}** with **{user_role}** privileges.")
-        
-        # Role-specific welcome message
-        if user_role == "admin":
-            sac.alert(
-                label='Admin Dashboard',
-                description='You have full administrative access to all features and data.',
-                banner=True,
-                icon=True,
-                key='admin_welcome'
+        # Fetch and display current Kaspa data
+        df = fetch_kaspa_price_data()
+        if not df.empty:
+            current_price = df['price'].iloc[-1]
+            price_change = ((current_price - df['price'].iloc[-2]) / df['price'].iloc[-2]) * 100
+            
+            st.metric(
+                "KAS Price", 
+                f"${current_price:.4f}", 
+                f"{price_change:+.2f}%"
             )
-        else:
-            sac.alert(
-                label='User Dashboard',
-                description='Welcome! You have access to your personalized dashboard and reports.',
-                banner=True,
-                icon=True,
-                key='user_welcome'
+            
+            st.metric(
+                "24h Volume",
+                f"${df['volume'].iloc[-1]:,.0f}",
+                "Volume"
             )
     
-    with col2:
-        st.subheader("Rate your experience")
-        rating = sac.rate(label='Satisfaction', value=4, key='satisfaction_rating')
-        if rating:
-            st.write(f"Rating: {rating}/5 ⭐")
+    # Main content routing
+    if not selected:
+        selected = 'overview'
     
-    # Key metrics (role-based)
-    st.subheader("📊 Key Metrics")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    if user_role == "admin":
-        # Admin sees all metrics
-        with col1:
-            st.metric("Total Users", "12,345", "↗️ 234 (12%)")
-            st.write(sac.Tag("All Users", color='green'))
-        
-        with col2:
-            st.metric("System Revenue", "$98,765", "↗️ $8,765 (9%)")
-            st.write(sac.Tag("Full Access", color='blue'))
-        
-        with col3:
-            st.metric("All Orders", "8,901", "↘️ -123 (-1%)")
-            st.write(sac.Tag("Monitor", color='orange'))
-        
-        with col4:
-            st.metric("System Performance", "98.5%", "↗️ 0.2%")
-            st.write(sac.Tag("Admin View", color='red'))
+    if selected == 'overview':
+        render_overview(subscription_level)
+    elif selected == 'price_charts':
+        render_price_charts(subscription_level)
+    elif selected == 'power_law_basic':
+        render_power_law_basic(subscription_level)
+    elif selected == 'power_law_advanced':
+        render_power_law_advanced(subscription_level)
+    elif selected == 'network_metrics':
+        render_network_metrics(subscription_level)
+    elif selected == 'power_law_research':
+        render_power_law_research(subscription_level)
+    elif selected == 'data_export':
+        render_data_export(subscription_level)
+    elif selected == 'upgrade':
+        render_upgrade_page('premium')
+    elif selected == 'upgrade_pro':
+        render_upgrade_page('pro')
     else:
-        # Regular users see limited metrics
-        with col1:
-            st.metric("My Reports", "23", "↗️ 3")
-            st.write(sac.Tag("Personal", color='blue'))
-        
-        with col2:
-            st.metric("My Activity", "156", "↗️ 12")
-            st.write(sac.Tag("Active", color='green'))
-        
-        with col3:
-            st.metric("Notifications", "7", "↗️ 2")
-            st.write(sac.Tag("New", color='orange'))
-        
-        with col4:
-            st.metric("Profile Score", "85%", "↗️ 5%")
-            st.write(sac.Tag("Good", color='purple'))
-    
-    # Recent activity
-    st.subheader("📈 Recent Activity")
-    
-    if user_role == "admin":
-        activities = [
-            "System backup completed successfully",
-            "New user 'demo_user' registered",
-            "Security audit passed",
-            "Database optimization completed",
-            "3 new support tickets created"
-        ]
-    else:
-        activities = [
-            f"Welcome back, {name}!",
-            "Profile updated successfully",
-            "New notification received",
-            "Report generated successfully",
-            "Dashboard preferences saved"
-        ]
-    
-    for i, activity in enumerate(activities):
-        st.write(f"• {activity}")
+        render_overview(subscription_level)
 
-def render_user_management():
-    """Admin-only user management page"""
+def render_overview(subscription_level):
+    """Render overview dashboard"""
+    st.title("📊 Kaspa Market Overview")
     
-    st.title("👥 User Management")
-    st.write("Manage system users, roles, and permissions.")
+    # Fetch data
+    df = fetch_kaspa_price_data()
     
-    # User list with antd components
-    st.subheader("📋 System Users")
-    
-    # Sample user data
-    users_data = pd.DataFrame({
-        'Username': ['admin', 'jsmith', 'mwilson', 'demo_user'],
-        'Full Name': ['Admin User', 'John Smith', 'Mary Wilson', 'Demo User'],
-        'Email': ['admin@company.com', 'john.smith@company.com', 'mary.wilson@company.com', 'demo@company.com'],
-        'Role': ['Admin', 'User', 'User', 'User'],
-        'Status': ['Active', 'Active', 'Active', 'Inactive']
-    })
-    
-    st.dataframe(users_data, use_container_width=True)
-    
-    # User actions
-    st.subheader("🔧 User Actions")
-    
-    user_action = sac.buttons([
-        sac.ButtonsItem(label='Add User', icon='person-plus'),
-        sac.ButtonsItem(label='Edit Roles', icon='pencil-square'),
-        sac.ButtonsItem(label='Export Users', icon='download'),
-    ], index=None, format_func='title', key='user_management_actions')
-    
-    if user_action:
-        st.success(f"Action triggered: {user_action}")
-
-def render_system_settings():
-    """Admin-only system settings page"""
-    
-    st.title("⚙️ System Settings")
-    st.write("Configure system-wide settings and preferences.")
-    
-    settings_tab = sac.tabs([
-        sac.TabsItem(label='General', icon='gear'),
-        sac.TabsItem(label='Security', icon='shield'),
-        sac.TabsItem(label='Backup', icon='cloud'),
-        sac.TabsItem(label='Integration', icon='puzzle'),
-    ], index=0, key='system_settings_tabs')
-    
-    if settings_tab == 'General':
-        st.subheader("🎛️ General System Settings")
-        
-        maintenance_mode = sac.switch(label='Maintenance Mode', value=False, key='maintenance_mode')
-        debug_logging = sac.switch(label='Debug Logging', value=True, key='debug_logging')
-        auto_backup = sac.switch(label='Automatic Backup', value=True, key='auto_backup')
-        
-    elif settings_tab == 'Security':
-        st.subheader("🔒 Security Settings")
-        
-        two_factor = sac.switch(label='Require 2FA', value=False, key='two_factor')
-        session_timeout = st.slider("Session Timeout (minutes)", 15, 480, 60)
-        password_policy = sac.checkbox(['Uppercase required', 'Numbers required', 'Special chars required'], 
-                                     index=[0, 1], key='password_policy')
-
-def render_audit_logs():
-    """Admin-only audit logs page"""
-    
-    st.title("📋 Audit Logs")
-    st.write("View system activity and security logs.")
-    
-    # Sample audit data
-    audit_data = pd.DataFrame({
-        'Timestamp': pd.date_range('2024-06-04 08:00', periods=10, freq='H'),
-        'User': ['admin', 'jsmith', 'mwilson', 'admin', 'jsmith'] * 2,
-        'Action': ['Login', 'View Report', 'Update Profile', 'System Config', 'Export Data'] * 2,
-        'IP Address': ['192.168.1.1', '192.168.1.2', '192.168.1.3', '192.168.1.1', '192.168.1.2'] * 2,
-        'Status': ['Success'] * 10
-    })
-    
-    st.dataframe(audit_data, use_container_width=True)
-
-def render_user_profile(name, username):
-    """User profile page"""
-    
-    st.title("👤 User Profile")
-    st.write(f"Manage your profile settings, {name}.")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📝 Personal Information")
-        st.text_input("Full Name", value=name)
-        st.text_input("Username", value=username, disabled=True)
-        st.text_input("Email", value=f"{username}@company.com")
-    
-    with col2:
-        st.subheader("🎛️ Preferences")
-        
-        email_notifications = sac.switch(label='Email Notifications', value=True, key='profile_email_notif')
-        weekly_digest = sac.switch(label='Weekly Digest', value=False, key='profile_weekly_digest')
-        
-        language = st.selectbox("Language", ["English", "Spanish", "French"])
-        timezone = st.selectbox("Timezone", ["UTC", "EST", "PST", "CET"])
-    
-    if st.button("💾 Save Profile", type="primary"):
-        st.success("Profile updated successfully!")
-
-def render_generic_page(page_name, user_role):
-    """Generic page renderer for other pages"""
-    
-    st.title(f"🎯 {page_name.replace('_', ' ').title()}")
-    
-    # Role-based access control
-    admin_only_pages = ['user_management', 'system_settings', 'audit_logs', 'backup']
-    
-    if page_name in admin_only_pages and user_role != 'admin':
-        sac.alert(
-            label='Access Denied',
-            description='You do not have permission to access this page. Contact your administrator.',
-            banner=True,
-            icon=True,
-            key=f'{page_name}_access_denied'
-        )
+    if df.empty:
+        st.error("Unable to load market data. Please try again later.")
         return
     
-    st.write(f"This is the **{page_name.replace('_', ' ').title()}** section.")
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
     
-    if user_role == 'admin':
-        st.info("You have full administrative access to this section.")
+    current_price = df['price'].iloc[-1]
+    price_change_24h = ((current_price - df['price'].iloc[-2]) / df['price'].iloc[-2]) * 100
+    price_change_7d = ((current_price - df['price'].iloc[-7]) / df['price'].iloc[-7]) * 100
+    
+    with col1:
+        st.metric("Current Price", f"${current_price:.4f}", f"{price_change_24h:+.2f}%")
+    
+    with col2:
+        st.metric("7D Change", f"{price_change_7d:+.2f}%")
+    
+    with col3:
+        st.metric("Market Cap", "$2.1B", "Est.")
+    
+    with col4:
+        if subscription_level != 'free':
+            st.metric("Power Law Position", "Above Trend", "+15%")
+        else:
+            st.metric("Power Law", "🔒 Premium", "Upgrade")
+    
+    # Price chart
+    st.subheader("📈 Price Chart")
+    
+    # Limit data for free users
+    if subscription_level == 'free':
+        chart_df = df.tail(30)  # Last 30 days only
+        st.info("📅 Free users see last 30 days. Upgrade for full historical data.")
     else:
-        st.info("You have user-level access to this section.")
+        chart_df = df
     
-    # Show sample content based on page
-    if 'report' in page_name:
-        time_period = sac.segmented(['Daily', 'Weekly', 'Monthly'], index=1, key=f'{page_name}_period')
-        st.write(f"Generating {time_period} {page_name.replace('_', ' ')} report...")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=chart_df['timestamp'],
+        y=chart_df['price'],
+        mode='lines',
+        name='KAS Price',
+        line=dict(color='#70C7BA', width=2)
+    ))
+    
+    fig.update_layout(
+        title="Kaspa Price History",
+        xaxis_title="Date",
+        yaxis_title="Price (USD)",
+        height=400,
+        showlegend=True
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Power law preview
+    if subscription_level == 'free':
+        st.subheader("🔒 Power Law Analysis Preview")
+        show_paywall("Advanced Power Law Analysis", "premium")
+    else:
+        st.subheader("📊 Power Law Analysis")
+        render_power_law_preview(df, subscription_level)
 
-# Main application logic
-def main():
-    """Main application entry point"""
+def render_power_law_preview(df, subscription_level):
+    """Render power law analysis preview"""
+    power_law_df, metrics = calculate_power_law_metrics(df, subscription_level)
     
-    # Check authentication status from session state
-    authentication_status = st.session_state.get('authentication_status')
-    name = st.session_state.get('name')
-    username = st.session_state.get('username')
+    fig = go.Figure()
     
-    # If not authenticated, show login page
-    if authentication_status is not True:
-        name, authentication_status, username = show_login_page()
+    # Actual price
+    fig.add_trace(go.Scatter(
+        x=power_law_df['timestamp'],
+        y=power_law_df['price'],
+        mode='lines',
+        name='Actual Price',
+        line=dict(color='#70C7BA', width=2)
+    ))
+    
+    # Power law trend
+    fig.add_trace(go.Scatter(
+        x=power_law_df['timestamp'],
+        y=power_law_df['power_law_fit'],
+        mode='lines',
+        name='Power Law Trend',
+        line=dict(color='red', width=2, dash='dash')
+    ))
+    
+    if subscription_level in ['premium', 'pro']:
+        # Support and resistance levels
+        fig.add_trace(go.Scatter(
+            x=power_law_df['timestamp'],
+            y=power_law_df['support_level'],
+            mode='lines',
+            name='Support',
+            line=dict(color='green', width=1, dash='dot'),
+            opacity=0.7
+        ))
         
-        # If login successful, rerun to show main app
-        if authentication_status is True:
-            st.rerun()
-    else:
-        # User is authenticated, show main app
-        show_main_app(name, username)
+        fig.add_trace(go.Scatter(
+            x=power_law_df['timestamp'],
+            y=power_law_df['resistance_level'],
+            mode='lines',
+            name='Resistance',
+            line=dict(color='red', width=1, dash='dot'),
+            opacity=0.7
+        ))
+    
+    fig.update_layout(
+        title="Kaspa Power Law Analysis",
+        xaxis_title="Date",
+        yaxis_title="Price (USD)",
+        yaxis_type="log",
+        height=500
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Metrics display
+    if subscription_level in ['premium', 'pro']:
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Power Law Slope", f"{metrics['slope']:.3f}")
+        with col2:
+            st.metric("R-Squared", f"{metrics['r_squared']:.3f}")
+        with col3:
+            st.metric("Current Deviation", f"{metrics['current_deviation']:+.1%}")
 
-# Run the application
-if __name__ == "__main__":
-    main()
+def render_price_charts(subscription_level):
+    """Render price charts page"""
+    st.title("📈 Price Charts")
+    
+    df = fetch_kaspa_price_data()
+    
+    if subscription_level == 'free':
+        df = df.tail(30)
+        st.warning("📅 Free tier: Limited to 30 days of data")
+    
+    # Chart controls
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        chart_type = st.selectbox("Chart Type", ["Line", "Candlestick", "Area"])
+    
+    with col2:
+        if subscription_level != 'free':
+            timeframe = st.selectbox("Timeframe", ["1D", "7D", "30D", "90D", "1Y", "All"])
+        else:
+            timeframe = st.selectbox("Timeframe", ["1D", "7D", "30D"])
+    
+    with col3:
+        show_volume = st.checkbox("Show Volume", value=True)
+    
+    # Create chart based on selection
+    if chart_type == "Line":
+        fig = px.line(df, x='timestamp', y='price', title="Kaspa Price")
+    elif chart_type == "Area":
+        fig = px.area(df, x='timestamp', y='price', title="Kaspa Price")
+    else:
+        if subscription_level == 'free':
+            st.info("🔒 Candlestick charts available in Premium")
+            fig = px.line(df, x='timestamp', y='price', title="Kaspa Price")
+        else:
+            # Would implement proper OHLC data here
+            fig = px.line(df, x='timestamp', y='price', title="Kaspa Price (Candlestick mode)")
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    if show_volume and subscription_level != 'free':
+        vol_fig = px.bar(df, x='timestamp', y='volume', title="Trading Volume")
+        st.plotly_chart(vol_fig, use_container_width=True)
+
+def render_power_law_basic(subscription_level):
+    """Render basic power law analysis"""
+    st.title("📊 Power Law Analysis")
+    
+    if subscription_level == 'free':
+        df = fetch_kaspa_price_data()
+        power_law_df, coeffs = calculate_basic_power_law(df.tail(90))  # Limited data
+        
+        st.info("📅 Free tier: Basic power law with 90 days of data")
+        
+        # Simple chart
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=power_law_df['timestamp'],
+            y=power_law_df['price'],
+            name='Price',
+            line=dict(color='#70C7BA')
+        ))
+        fig.add_trace(go.Scatter(
+            x=power_law_df['timestamp'],
+            y=power_law_df['power_law_fit'],
+            name='Power Law Fit',
+            line=dict(color='red', dash='dash')
+        ))
+        
+        fig.update_layout(title="Basic Power Law Analysis", yaxis_type="log")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("### 🔒 Advanced Features")
+        show_paywall("Advanced Power Law Analysis", "premium")
+    else:
+        st.info("You have premium access! Visit 'Advanced Analytics > Power Law Advanced' for full features.")
+
+def render_power_law_advanced(subscription_level):
+    """Render advanced power law analysis"""
+    if subscription_level == 'free':
+        show_paywall("Advanced Power Law Analysis", "premium")
+        return
+    
+    st.title("🔬 Advanced Power Law Analysis")
+    
+    df = fetch_kaspa_price_data()
+    power_law_df, metrics = calculate_advanced_power_law(df)
+    
+    # Advanced visualization
+    fig = go.Figure()
+    
+    # Price and trend
+    fig.add_trace(go.Scatter(
+        x=power_law_df['timestamp'],
+        y=power_law_df['price'],
+        name='Actual Price',
+        line=dict(color='#70C7BA', width=2)
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=power_law_df['timestamp'],
+        y=power_law_df['power_law_fit'],
+        name='Power Law Trend',
+        line=dict(color='red', width=2, dash='dash')
+    ))
+    
+    # Support/Resistance bands
+    fig.add_trace(go.Scatter(
+        x=power_law_df['timestamp'],
+        y=power_law_df['support_level'],
+        fill=None,
+        mode='lines',
+        name='Support',
+        line=dict(color='green', width=1),
+        opacity=0.3
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=power_law_df['timestamp'],
+        y=power_law_df['resistance_level'],
+        fill='tonexty',
+        mode='lines',
+        name='Resistance',
+        line=dict(color='red', width=1),
+        opacity=0.3
+    ))
+    
+    fig.update_layout(
+        title="Advanced Power Law Analysis with Support/Resistance",
+        yaxis_type="log",
+        height=600
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Advanced metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Power Law Slope", f"{metrics['slope']:.4f}")
+    with col2:
+        st.metric("R-Squared", f"{metrics['r_squared']:.4f}")
+    with col3:
