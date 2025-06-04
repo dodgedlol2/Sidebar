@@ -26,19 +26,19 @@ def load_config():
                     'email': 'admin@company.com',
                     'first_name': 'Admin',
                     'last_name': 'User',
-                    'password': '$2b$12$R9Ek8JIj3VJLv7Z1QHE.quGbQnTG8jC9Y8Kk1kV9FjI.KJHGFDS1e'  # 'admin123'
+                    'password': 'admin123'  # Plain text - will be hashed by authenticator
                 },
                 'jsmith': {
                     'email': 'john.smith@company.com',
                     'first_name': 'John',
                     'last_name': 'Smith',
-                    'password': '$2b$12$3P4t7y8R9Ek8JIj3VJLv7Z1QHE.quGbQnTG8jC9Y8Kk1kV9FjI.KJ'  # 'user123'
+                    'password': 'user123'  # Plain text - will be hashed by authenticator
                 },
                 'mwilson': {
                     'email': 'mary.wilson@company.com',
                     'first_name': 'Mary',
                     'last_name': 'Wilson',
-                    'password': '$2b$12$7Z1QHE.quGbQnTG8jC9Y8Kk1kV9FjI.KJHGFDS1eR9Ek8JIj3VJLv'  # 'mary456'
+                    'password': 'mary456'  # Plain text - will be hashed by authenticator
                 }
             }
         },
@@ -54,14 +54,15 @@ def load_config():
     }
     return config
 
-# Initialize authenticator
+# Initialize authenticator with auto_hash=True
 config = load_config()
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
     config['cookie']['key'],
     config['cookie']['expiry_days'],
-    config['preauthorized']
+    config['preauthorized'],
+    auto_hash=True  # This will automatically hash plain text passwords
 )
 
 # Custom CSS for better styling
@@ -143,21 +144,9 @@ def show_login_page():
         username = st.session_state.get('username')
         
         if authentication_status == False:
-            sac.alert(
-                label='Authentication Failed',
-                description='Username/password is incorrect. Please try again.',
-                banner=True,
-                icon=True,
-                key='login_error'
-            )
+            st.error("❌ Username/password is incorrect. Please try again.")
         elif authentication_status == None:
-            sac.alert(
-                label='Welcome!',
-                description='Please enter your username and password to continue.',
-                banner=True,
-                icon=True,
-                key='login_info'
-            )
+            st.info("ℹ️ Please enter your username and password to continue.")
         
         # Demo credentials info
         st.markdown("---")
