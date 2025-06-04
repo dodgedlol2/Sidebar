@@ -448,14 +448,47 @@ def show_main_app(name, username):
         render_power_law_advanced(subscription_level)
     elif selected == 'network_metrics':
         render_network_metrics(subscription_level)
+    elif selected == 'correlation_analysis':
+        if subscription_level == 'free':
+            show_paywall("Correlation Analysis", "premium")
+        else:
+            st.title("📊 Correlation Analysis")
+            st.info("Advanced correlation analysis between Kaspa price and various metrics.")
+    elif selected == 'custom_indicators':
+        if subscription_level != 'pro':
+            show_paywall("Custom Indicators", "pro")
+        else:
+            st.title("🎯 Custom Indicators")
+            st.info("Build and test your own custom technical indicators.")
     elif selected == 'power_law_research':
         render_power_law_research(subscription_level)
+    elif selected == 'reports':
+        if subscription_level != 'pro':
+            show_paywall("Research Reports", "pro")
+        else:
+            st.title("📑 Research Reports")
+            st.info("Generate comprehensive research reports based on your analysis.")
+    elif selected == 'api_access':
+        if subscription_level != 'pro':
+            show_paywall("API Access", "pro")
+        else:
+            st.title("🤖 API Access")
+            st.info("Programmatic access to all Kaspa analytics data and models.")
     elif selected == 'data_export':
         render_data_export(subscription_level)
+    elif selected == 'alerts':
+        if subscription_level == 'free':
+            show_paywall("Price Alerts", "premium")
+        else:
+            st.title("🔔 Price Alerts")
+            st.info("Set up custom price and deviation alerts.")
     elif selected == 'upgrade':
         render_upgrade_page('premium')
     elif selected == 'upgrade_pro':
         render_upgrade_page('pro')
+    elif selected == 'settings':
+        st.title("⚙️ Settings")
+        st.info("Account settings and preferences.")
     else:
         render_overview(subscription_level)
 
