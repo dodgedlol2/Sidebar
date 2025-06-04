@@ -148,7 +148,6 @@ def show_login_page():
                 description='Username/password is incorrect. Please try again.',
                 banner=True,
                 icon=True,
-                type='error',
                 key='login_error'
             )
         elif authentication_status == None:
@@ -157,7 +156,6 @@ def show_login_page():
                 description='Please enter your username and password to continue.',
                 banner=True,
                 icon=True,
-                type='info',
                 key='login_info'
             )
         
@@ -382,7 +380,6 @@ def render_home(name, username, user_role):
                 description='You have full administrative access to all features and data.',
                 banner=True,
                 icon=True,
-                type='success',
                 key='admin_welcome'
             )
         else:
@@ -391,7 +388,6 @@ def render_home(name, username, user_role):
                 description='Welcome! You have access to your personalized dashboard and reports.',
                 banner=True,
                 icon=True,
-                type='info',
                 key='user_welcome'
             )
     
@@ -580,7 +576,6 @@ def render_generic_page(page_name, user_role):
             description='You do not have permission to access this page. Contact your administrator.',
             banner=True,
             icon=True,
-            type='error',
             key=f'{page_name}_access_denied'
         )
         return
