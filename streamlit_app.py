@@ -134,8 +134,13 @@ def show_login_page():
     with col2:
         st.markdown('<div class="auth-container">', unsafe_allow_html=True)
         
-        # Login widget - Use 'main' location
-        name, authentication_status, username = authenticator.login('Login', 'main')
+        # Login widget - Use the correct modern syntax
+        authenticator.login()
+        
+        # Get authentication status from session state
+        name = st.session_state.get('name')
+        authentication_status = st.session_state.get('authentication_status')
+        username = st.session_state.get('username')
         
         if authentication_status == False:
             sac.alert(
@@ -209,10 +214,8 @@ def show_main_app(name, username):
         
         # Logout button
         if st.button("🚪 Logout", type="secondary", use_container_width=True):
-            # Clear session state
-            st.session_state['authentication_status'] = None
-            st.session_state['name'] = None
-            st.session_state['username'] = None
+            # Use authenticator logout
+            authenticator.logout()
             st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -598,27 +601,21 @@ def render_generic_page(page_name, user_role):
 def main():
     """Main application entry point"""
     
-    # Check if user is already authenticated via session state
-    if 'authentication_status' not in st.session_state:
-        st.session_state['authentication_status'] = None
-    if 'name' not in st.session_state:
-        st.session_state['name'] = None
-    if 'username' not in st.session_state:
-        st.session_state['username'] = None
+    # Check authentication status from session state
+    authentication_status = st.session_state.get('authentication_status')
+    name = st.session_state.get('name')
+    username = st.session_state.get('username')
     
     # If not authenticated, show login page
-    if st.session_state['authentication_status'] is not True:
+    if authentication_status is not True:
         name, authentication_status, username = show_login_page()
         
-        # Update session state if login successful
-        if authentication_status:
-            st.session_state['authentication_status'] = authentication_status
-            st.session_state['name'] = name
-            st.session_state['username'] = username
+        # If login successful, rerun to show main app
+        if authentication_status is True:
             st.rerun()
     else:
         # User is authenticated, show main app
-        show_main_app(st.session_state['name'], st.session_state['username'])
+        show_main_app(name, username)
 
 # Run the application
 if __name__ == "__main__":
