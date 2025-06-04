@@ -1,0 +1,26 @@
+credentials:
+  usernames:
+    admin:
+      email: admin@company.com
+      first_name: Admin
+      last_name: User
+      password: admin123  # Will be automatically hashed
+    jsmith:
+      email: john.smith@company.com
+      first_name: John
+      last_name: Smith
+      password: user123  # Will be automatically hashed
+    mwilson:
+      email: mary.wilson@company.com
+      first_name: Mary
+      last_name: Wilson
+      password: mary456  # Will be automatically hashed
+
+cookie:
+  name: dashboard_auth_cookie
+  key: your_secret_random_key_change_this_in_production  # CHANGE THIS!
+  expiry_days: 30
+
+preauthorized:
+  - admin@company.com
+  - new.user@company.com
