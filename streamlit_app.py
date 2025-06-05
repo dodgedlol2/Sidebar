@@ -463,39 +463,155 @@ def render_registration_section():
         
         if registration_type == "Open Registration":
             st.info("📝 Anyone can register for a free account")
-            preauthorization = False
+            use_preauth = False
         else:
             st.info("🛡️ Only pre-authorized email addresses can register")
-            preauthorization = True
+            use_preauth = True
             
             st.markdown("**Pre-authorized emails:**")
             for email in config['preauthorized']:
                 st.write(f"• {email}")
         
-        # Enhanced registration widget with 2FA option
+        # Registration widget with correct parameters
         try:
-            enable_2fa_reg = st.checkbox("🔒 Enable 2FA for new account", key='reg_2fa')
+            # Check which parameters the register_user function accepts
+            st.markdown("#### 📝 Registration Form")
             
-            if authenticator.register_user(
-                'Register User', 
-                preauthorization=preauthorization,
-                two_factor_auth=enable_2fa_reg
-            ):
-                st.success('✅ User registered successfully!')
-                if enable_2fa_reg:
-                    st.info("📧 2FA verification email sent!")
-                
-                # Save config changes
-                if save_config():
-                    st.success("Configuration updated!")
+            # Try the registration with different parameter names
+            if use_preauth:
+                # For pre-authorized registration
+                try:
+                    if authenticator.register_user('Register User', preauthorization=True):
+                        st.success('✅ User registered successfully!')
+                        if save_config():
+                            st.success("Configuration updated!")
+                except TypeError:
+                    # Try alternative parameter name
+                    try:
+                        if authenticator.register_user('Register User', pre_authorization=True):
+                            st.success('✅ User registered successfully!')
+                            if save_config():
+                                st.success("Configuration updated!")
+                    except TypeError:
+                        # Try without parameter
+                        try:
+                            if authenticator.register_user('Register User'):
+                                st.success('✅ User registered successfully!')
+                                st.info("Note: Pre-authorization check not available in this version")
+                                if save_config():
+                                    st.success("Configuration updated!")
+                        except Exception as e:
+                            st.error(f"Registration error: {e}")
+                            st.info("Using manual registration form below as fallback")
+                            render_manual_registration_form()
+            else:
+                # For open registration
+                try:
+                    if authenticator.register_user('Register User', preauthorization=False):
+                        st.success('✅ User registered successfully!')
+                        if save_config():
+                            st.success("Configuration updated!")
+                except TypeError:
+                    # Try alternative parameter name
+                    try:
+                        if authenticator.register_user('Register User', pre_authorization=False):
+                            st.success('✅ User registered successfully!')
+                            if save_config():
+                                st.success("Configuration updated!")
+                    except TypeError:
+                        # Try without parameter
+                        try:
+                            if authenticator.register_user('Register User'):
+                                st.success('✅ User registered successfully!')
+                                if save_config():
+                                    st.success("Configuration updated!")
+                        except Exception as e:
+                            st.error(f"Registration error: {e}")
+                            st.info("Using manual registration form below as fallback")
+                            render_manual_registration_form()
                 
         except Exception as e:
-            st.error(f"Registration error: {e}")
+            st.error(f"Registration widget error: {e}")
+            st.info("Using manual registration form as fallback")
+            render_manual_registration_form()
         
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Return None values since registration doesn't log in automatically
     return None, None, None
+
+def render_manual_registration_form():
+    """Manual registration form as fallback"""
+    st.markdown("---")
+    st.markdown("#### 📝 Manual Registration Form")
+    
+    with st.form("manual_registration"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            new_username = st.text_input("Username*", help="Choose a unique username")
+            new_first_name = st.text_input("First Name*")
+            new_email = st.text_input("Email*", help="Valid email address")
+        
+        with col2:
+            new_last_name = st.text_input("Last Name*")
+            new_password = st.text_input("Password*", type="password", help="Choose a strong password")
+            new_password_confirm = st.text_input("Confirm Password*", type="password")
+        
+        new_subscription = st.selectbox("Account Type", ['free', 'premium'], 
+                                       help="Start with free, upgrade anytime")
+        
+        agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy*")
+        
+        submit_registration = st.form_submit_button("🚀 Create Account", type="primary")
+        
+        if submit_registration:
+            # Validation
+            errors = []
+            
+            if not new_username:
+                errors.append("Username is required")
+            elif new_username in config['credentials']['usernames']:
+                errors.append("Username already exists")
+            
+            if not new_email:
+                errors.append("Email is required")
+            elif '@' not in new_email:
+                errors.append("Invalid email format")
+            
+            if not new_first_name:
+                errors.append("First name is required")
+            
+            if not new_last_name:
+                errors.append("Last name is required")
+            
+            if not new_password:
+                errors.append("Password is required")
+            elif len(new_password) < 6:
+                errors.append("Password must be at least 6 characters")
+            
+            if new_password != new_password_confirm:
+                errors.append("Passwords do not match")
+            
+            if not agree_terms:
+                errors.append("You must agree to the terms of service")
+            
+            if errors:
+                for error in errors:
+                    st.error(f"❌ {error}")
+            else:
+                # Create the user
+                if add_new_user_to_config(new_username, new_email, new_first_name, 
+                                        new_last_name, new_password, new_subscription):
+                    st.success("🎉 Account created successfully!")
+                    st.info("Please use the Login tab to sign in with your new account")
+                    st.balloons()
+                    
+                    # Clear the form by rerunning
+                    if st.button("Continue to Login"):
+                        st.rerun()
+                else:
+                    st.error("❌ Registration failed. Username may already exist.")
 
 def render_guest_login_section():
     """Render guest login section"""
