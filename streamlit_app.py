@@ -94,8 +94,6 @@ def get_auth_config():
 # Simple config management functions for Streamlit Cloud
 def add_new_user_to_config(username, email, first_name, last_name, password, subscription='free'):
     """Add new user to session state config with proper password hashing"""
-    global config  # Move global declaration to the top
-    
     if 'config' not in st.session_state:
         st.session_state.config = get_auth_config()
     
@@ -115,22 +113,16 @@ def add_new_user_to_config(username, email, first_name, last_name, password, sub
             'created_at': datetime.now().isoformat()
         }
         
-        # Also update the global config variable
-        config = st.session_state.config
-        
         return True
     return False
 
 def update_user_subscription_in_config(username, new_subscription):
     """Update user subscription in session state"""
-    global config  # Move global declaration to the top
-    
     if 'config' not in st.session_state:
         st.session_state.config = get_auth_config()
     
     if username in st.session_state.config['credentials']['usernames']:
         st.session_state.config['credentials']['usernames'][username]['subscription'] = new_subscription
-        config = st.session_state.config  # Update global config
         return True
     return False
 
@@ -153,17 +145,12 @@ authenticator = stauth.Authenticate(
 # Save config function - Streamlit Cloud version
 def save_config():
     """Save configuration changes to session state (Streamlit Cloud compatible)"""
-    global config  # Move global declaration to the top
-    
     try:
         # In Streamlit Cloud, we save to session state since we can't write files
         # In production with persistent storage, you'd write to a database or file
         
         # For demo purposes, we just update the session state
         if 'config' in st.session_state:
-            # Update the global config variable
-            config = st.session_state.config
-            
             # Show success message
             st.success("✅ Configuration updated in session!")
             return True
