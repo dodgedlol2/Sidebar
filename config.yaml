@@ -1,26 +1,144 @@
 credentials:
   usernames:
     admin:
-      email: admin@company.com
+      email: admin@kaspalytics.com
       first_name: Admin
       last_name: User
-      password: admin123  # Will be automatically hashed
-    jsmith:
-      email: john.smith@company.com
-      first_name: John
-      last_name: Smith
-      password: user123  # Will be automatically hashed
-    mwilson:
-      email: mary.wilson@company.com
-      first_name: Mary
-      last_name: Wilson
-      password: mary456  # Will be automatically hashed
+      password: admin123  # Will be auto-hashed
+      subscription: pro
+      failed_login_attempts: 0
+      logged_in: false
+    premium_user:
+      email: premium@example.com
+      first_name: Premium
+      last_name: User
+      password: premium123  # Will be auto-hashed
+      subscription: premium
+      failed_login_attempts: 0
+      logged_in: false
+    free_user:
+      email: free@example.com
+      first_name: Free
+      last_name: User
+      password: free123  # Will be auto-hashed
+      subscription: free
+      failed_login_attempts: 0
+      logged_in: false
+    demo_researcher:
+      email: researcher@kaspalytics.com
+      first_name: Research
+      last_name: Demo
+      password: research123  # Will be auto-hashed
+      subscription: pro
+      failed_login_attempts: 0
+      logged_in: false
 
 cookie:
-  name: dashboard_auth_cookie
-  key: your_secret_random_key_change_this_in_production  # CHANGE THIS!
+  name: kaspa_analytics_auth
+  key: kaspa_secret_key_12345_change_in_production  # CHANGE THIS IN PRODUCTION!
   expiry_days: 30
 
 preauthorized:
-  - admin@company.com
-  - new.user@company.com
+  - admin@kaspalytics.com
+  - newuser@kaspalytics.com
+  - beta@kaspalytics.com
+  - researcher@kaspalytics.com
+  - premium@kaspalytics.com
+
+# Your API key for enhanced features (2FA, email notifications, etc.)
+api_key: a9fz9gh0zq7io3zpjnya1vmx8et9b3pd
+
+# Optional: OAuth2 configuration for guest login
+oauth2:
+  google:
+    client_id: your_google_client_id_here
+    client_secret: your_google_client_secret_here
+    server_metadata_url: https://accounts.google.com/.well-known/openid_configuration
+  microsoft:
+    client_id: your_microsoft_client_id_here
+    client_secret: your_microsoft_client_secret_here
+    server_metadata_url: https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration
+
+# Password requirements (optional)
+password_policy:
+  min_length: 8
+  require_uppercase: true
+  require_lowercase: true
+  require_numbers: true
+  require_special_chars: false
+
+# Email settings for password recovery and 2FA
+email:
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  sender_email: noreply@kaspalytics.com
+  sender_password: your_app_password_here  # Use app-specific password
+  
+# Security settings
+security:
+  max_failed_attempts: 5
+  lockout_duration_minutes: 30
+  session_timeout_minutes: 120
+  require_email_verification: false
+  
+# Subscription tiers configuration
+subscription_tiers:
+  free:
+    name: Free Tier
+    price: 0
+    features:
+      - Basic price charts
+      - 30-day data history
+      - Simple power law analysis
+    limits:
+      data_retention_days: 30
+      api_calls_per_day: 0
+      export_limit_per_month: 0
+      
+  premium:
+    name: Premium
+    price: 29
+    features:
+      - Advanced power law analysis
+      - Full historical data access
+      - Data export capabilities
+      - Network metrics analysis
+      - Real-time alerts
+      - Email support
+    limits:
+      data_retention_days: 0  # Unlimited
+      api_calls_per_day: 1000
+      export_limit_per_month: 50
+      
+  pro:
+    name: Professional
+    price: 99
+    features:
+      - All Premium features
+      - Research workspace
+      - Custom power law models
+      - API access
+      - Priority support
+      - White-label reports
+      - Custom indicators
+    limits:
+      data_retention_days: 0  # Unlimited
+      api_calls_per_day: 10000
+      export_limit_per_month: 0  # Unlimited
+
+# Feature flags
+features:
+  enable_2fa: true
+  enable_guest_login: true
+  enable_oauth: false  # Set to true when OAuth is configured
+  enable_password_reset: true
+  enable_user_registration: true
+  enable_email_notifications: true
+  
+# Application settings
+app:
+  name: Kaspa Analytics Pro
+  version: 1.0.0
+  environment: development  # development, staging, production
+  debug_mode: true
+  log_level: INFO
