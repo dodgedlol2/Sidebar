@@ -93,21 +93,30 @@ def get_auth_config():
 
 # Simple config management functions for Streamlit Cloud
 def add_new_user_to_config(username, email, first_name, last_name, password, subscription='free'):
-    """Add new user to session state config"""
+    """Add new user to session state config with proper password hashing"""
     if 'config' not in st.session_state:
         st.session_state.config = get_auth_config()
     
     if username not in st.session_state.config['credentials']['usernames']:
+        # Hash the password using the same method as streamlit-authenticator
+        import bcrypt
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
         st.session_state.config['credentials']['usernames'][username] = {
             'email': email,
             'first_name': first_name,
             'last_name': last_name,
-            'password': password,
+            'password': hashed_password,  # Store hashed password
             'subscription': subscription,
             'failed_login_attempts': 0,
             'logged_in': False,
             'created_at': datetime.now().isoformat()
         }
+        
+        # Also update the global config variable
+        global config
+        config = st.session_state.config
+        
         return True
     return False
 
@@ -505,54 +514,74 @@ def render_manual_registration_form():
         agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy*")
         
         submit_registration = st.form_submit_button("🚀 Create Account", type="primary")
+    
+    # Handle form submission OUTSIDE the form
+    if submit_registration:
+        # Validation
+        errors = []
         
-        if submit_registration:
-            # Validation
-            errors = []
-            
-            if not new_username:
-                errors.append("Username is required")
-            elif new_username in config['credentials']['usernames']:
-                errors.append("Username already exists")
-            
-            if not new_email:
-                errors.append("Email is required")
-            elif '@' not in new_email:
-                errors.append("Invalid email format")
-            
-            if not new_first_name:
-                errors.append("First name is required")
-            
-            if not new_last_name:
-                errors.append("Last name is required")
-            
-            if not new_password:
-                errors.append("Password is required")
-            elif len(new_password) < 6:
-                errors.append("Password must be at least 6 characters")
-            
-            if new_password != new_password_confirm:
-                errors.append("Passwords do not match")
-            
-            if not agree_terms:
-                errors.append("You must agree to the terms of service")
-            
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Create the user
-                if add_new_user_to_config(new_username, new_email, new_first_name, 
-                                        new_last_name, new_password, new_subscription):
-                    st.success("🎉 Account created successfully!")
-                    st.info("Please use the Login tab to sign in with your new account")
-                    st.balloons()
-                    
-                    # Clear the form by rerunning
-                    if st.button("Continue to Login"):
-                        st.rerun()
+        if not new_username:
+            errors.append("Username is required")
+        elif new_username in config['credentials']['usernames']:
+            errors.append("Username already exists")
+        
+        if not new_email:
+            errors.append("Email is required")
+        elif '@' not in new_email:
+            errors.append("Invalid email format")
+        
+        if not new_first_name:
+            errors.append("First name is required")
+        
+        if not new_last_name:
+            errors.append("Last name is required")
+        
+        if not new_password:
+            errors.append("Password is required")
+        elif len(new_password) < 6:
+            errors.append("Password must be at least 6 characters")
+        
+        if new_password != new_password_confirm:
+            errors.append("Passwords do not match")
+        
+        if not agree_terms:
+            errors.append("You must agree to the terms of service")
+        
+        if errors:
+            for error in errors:
+                st.error(f"❌ {error}")
+        else:
+            # Create the user
+            if add_new_user_to_config(new_username, new_email, new_first_name, 
+                                    new_last_name, new_password, new_subscription):
+                st.success("🎉 Account created successfully!")
+                st.info("👈 Please use the Login tab to sign in with your new account")
+                st.balloons()
+                
+                # Show the created user details for confirmation
+                st.markdown("#### ✅ Registration Details:")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Username:** {new_username}")
+                    st.write(f"**Email:** {new_email}")
+                with col2:
+                    st.write(f"**Name:** {new_first_name} {new_last_name}")
+                    st.write(f"**Account Type:** {new_subscription}")
+                
+                # Debug: Show that user was added
+                if new_username in st.session_state.config['credentials']['usernames']:
+                    st.success(f"✅ User '{new_username}' successfully added to system!")
                 else:
-                    st.error("❌ Registration failed. Username may already exist.")
+                    st.error("❌ Error: User was not added to system")
+                
+            else:
+                st.error("❌ Registration failed. Username may already exist.")
+    
+    # Continue to Login button OUTSIDE the form
+    if 'submit_registration' in locals() and submit_registration and not errors:
+        if st.button("← Continue to Login"):
+            # Clear any registration state and redirect to login
+            st.rerun()
 
 def render_guest_login_section():
     """Render guest login section"""
