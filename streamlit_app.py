@@ -31,9 +31,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Authentication configuration with API key
+# Authentication configuration with API key - EMBEDDED VERSION
 def get_auth_config():
-    """Get authentication configuration with API key support"""
+    """Get authentication configuration - embedded for Streamlit Cloud"""
     config = {
         'credentials': {
             'usernames': {
@@ -63,6 +63,15 @@ def get_auth_config():
                     'subscription': 'free',
                     'failed_login_attempts': 0,
                     'logged_in': False
+                },
+                'researcher': {
+                    'email': 'researcher@kaspalytics.com',
+                    'first_name': 'Research',
+                    'last_name': 'Demo',
+                    'password': 'research123',
+                    'subscription': 'pro',
+                    'failed_login_attempts': 0,
+                    'logged_in': False
                 }
             }
         },
@@ -74,11 +83,43 @@ def get_auth_config():
         'preauthorized': [
             'admin@kaspalytics.com',
             'newuser@kaspalytics.com',
-            'beta@kaspalytics.com'
+            'beta@kaspalytics.com',
+            'researcher@kaspalytics.com',
+            'vip@kaspalytics.com'
         ],
         'api_key': 'a9fz9gh0zq7io3zpjnya1vmx8et9b3pd'  # Your API key for 2FA and email features
     }
     return config
+
+# Simple config management functions for Streamlit Cloud
+def add_new_user_to_config(username, email, first_name, last_name, password, subscription='free'):
+    """Add new user to session state config"""
+    if 'config' not in st.session_state:
+        st.session_state.config = get_auth_config()
+    
+    if username not in st.session_state.config['credentials']['usernames']:
+        st.session_state.config['credentials']['usernames'][username] = {
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'password': password,
+            'subscription': subscription,
+            'failed_login_attempts': 0,
+            'logged_in': False,
+            'created_at': datetime.now().isoformat()
+        }
+        return True
+    return False
+
+def update_user_subscription_in_config(username, new_subscription):
+    """Update user subscription in session state"""
+    if 'config' not in st.session_state:
+        st.session_state.config = get_auth_config()
+    
+    if username in st.session_state.config['credentials']['usernames']:
+        st.session_state.config['credentials']['usernames'][username]['subscription'] = new_subscription
+        return True
+    return False
 
 # Initialize configuration
 if 'config' not in st.session_state:
@@ -97,20 +138,117 @@ authenticator = stauth.Authenticate(
     api_key=config['api_key']  # Enable 2FA and email features
 )
 
-# Save config function
+# Save config function - Streamlit Cloud version
 def save_config():
-    """Save configuration changes"""
+    """Save configuration changes to session state (Streamlit Cloud compatible)"""
     try:
-        # In production, you'd save to a file:
-        # with open('config.yaml', 'w') as file:
-        #     yaml.dump(st.session_state.config, file, default_flow_style=False, allow_unicode=True)
+        # In Streamlit Cloud, we save to session state since we can't write files
+        # In production with persistent storage, you'd write to a database or file
         
-        # For demo, we'll just update session state
-        st.session_state.config = config
-        return True
+        # For demo purposes, we just update the session state
+        if 'config' in st.session_state:
+            # Update the global config variable
+            global config
+            config = st.session_state.config
+            
+            # Show success message
+            st.success("✅ Configuration updated in session!")
+            return True
+        return False
     except Exception as e:
         st.error(f"Error saving config: {e}")
         return False
+
+# Admin panel for user management (Streamlit Cloud compatible)
+def render_admin_panel():
+    """Admin panel for user management - works in Streamlit Cloud"""
+    if st.session_state.get('username') != 'admin':
+        st.error("🔒 Access denied. Admin only.")
+        return
+    
+    st.title("👑 Admin Panel")
+    
+    admin_tabs = sac.tabs([
+        sac.TabsItem(label='User Management', icon='people'),
+        sac.TabsItem(label='Add User', icon='person-plus'),
+        sac.TabsItem(label='System Stats', icon='graph-up'),
+    ], key='admin_tabs')
+    
+    if admin_tabs == 'User Management':
+        st.subheader("👥 Current Users")
+        
+        # Display current users
+        for username, user_info in config['credentials']['usernames'].items():
+            with st.expander(f"👤 {username} ({user_info.get('subscription', 'free')})"):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.write(f"**Name:** {user_info.get('first_name')} {user_info.get('last_name')}")
+                    st.write(f"**Email:** {user_info.get('email')}")
+                
+                with col2:
+                    st.write(f"**Subscription:** {user_info.get('subscription', 'free')}")
+                    st.write(f"**Failed Logins:** {user_info.get('failed_login_attempts', 0)}")
+                
+                with col3:
+                    new_subscription = st.selectbox(
+                        "Change Subscription:", 
+                        ['free', 'premium', 'pro'],
+                        index=['free', 'premium', 'pro'].index(user_info.get('subscription', 'free')),
+                        key=f"sub_{username}"
+                    )
+                    
+                    if st.button(f"Update {username}", key=f"update_{username}"):
+                        if update_user_subscription_in_config(username, new_subscription):
+                            st.success(f"✅ Updated {username} to {new_subscription}")
+                            st.rerun()
+    
+    elif admin_tabs == 'Add User':
+        st.subheader("➕ Add New User")
+        
+        with st.form("add_user_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                new_username = st.text_input("Username")
+                new_first_name = st.text_input("First Name")
+                new_email = st.text_input("Email")
+            
+            with col2:
+                new_last_name = st.text_input("Last Name")
+                new_subscription = st.selectbox("Subscription", ['free', 'premium', 'pro'])
+                new_password = st.text_input("Password", type="password")
+            
+            if st.form_submit_button("➕ Add User"):
+                if new_username and new_email and new_password:
+                    if add_new_user_to_config(new_username, new_email, new_first_name, new_last_name, new_password, new_subscription):
+                        st.success(f"✅ User {new_username} added successfully!")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ User {new_username} already exists!")
+                else:
+                    st.error("❌ Please fill in all required fields")
+    
+    else:  # System Stats
+        st.subheader("📊 System Statistics")
+        
+        total_users = len(config['credentials']['usernames'])
+        subscription_counts = {}
+        
+        for user_info in config['credentials']['usernames'].values():
+            sub = user_info.get('subscription', 'free')
+            subscription_counts[sub] = subscription_counts.get(sub, 0) + 1
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Users", total_users)
+        with col2:
+            st.metric("Free Users", subscription_counts.get('free', 0))
+        with col3:
+            st.metric("Premium Users", subscription_counts.get('premium', 0))
+        with col4:
+            st.metric("Pro Users", subscription_counts.get('pro', 0))
 
 # Custom CSS for Kaspa theme
 st.markdown("""
@@ -552,6 +690,10 @@ def show_main_app(name, username):
                 sac.MenuItem(type='divider'),
                 sac.MenuItem('account', icon='person-gear', description='Profile & Settings'),
             ]
+            
+            # Add admin panel for admin user
+            if username == 'admin':
+                menu_items.append(sac.MenuItem('admin_panel', icon='shield-check', tag=sac.Tag('Admin', color='red')))
         
         selected = sac.menu(menu_items, open_all=True, key='main_menu')
         
@@ -571,6 +713,8 @@ def show_main_app(name, username):
     # Content routing
     if selected == 'account':
         render_user_profile(name, username)
+    elif selected == 'admin_panel' and username == 'admin':
+        render_admin_panel()
     elif selected == 'overview':
         render_overview(subscription_level)
     elif selected == 'upgrade':
