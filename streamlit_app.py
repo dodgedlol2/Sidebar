@@ -475,9 +475,9 @@ def render_registration_section():
         try:
             st.markdown("#### 📝 Registration Form")
             
-            # Try the most basic registration call first
+            # Try with location parameter (seems to be required)
             try:
-                if authenticator.register_user('Register User'):
+                if authenticator.register_user('Register User', location='main'):
                     st.success('✅ User registered successfully!')
                     if save_config():
                         st.success("Configuration updated!")
