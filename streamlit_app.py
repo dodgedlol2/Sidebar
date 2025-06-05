@@ -94,6 +94,8 @@ def get_auth_config():
 # Simple config management functions for Streamlit Cloud
 def add_new_user_to_config(username, email, first_name, last_name, password, subscription='free'):
     """Add new user to session state config with proper password hashing"""
+    global config  # Move global declaration to the top
+    
     if 'config' not in st.session_state:
         st.session_state.config = get_auth_config()
     
@@ -114,7 +116,6 @@ def add_new_user_to_config(username, email, first_name, last_name, password, sub
         }
         
         # Also update the global config variable
-        global config
         config = st.session_state.config
         
         return True
