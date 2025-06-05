@@ -362,452 +362,6 @@ def show_authentication_page():
     st.markdown("*Now with enhanced security and user management*")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Authentication tabs
-    auth_tabs = sac.tabs([
-        sac.TabsItem(label='Login', icon='box-arrow-in-right'),
-        sac.TabsItem(label='Register', icon='person-plus'),
-        sac.TabsItem(label='Guest Login', icon='person-circle'),
-        sac.TabsItem(label='Password Help', icon='question-circle'),
-    ], index=0, key='auth_tabs')
-    
-    # Initialize return values
-    name = None
-    authentication_status = None
-    username = None
-    
-    if auth_tabs == 'Login':
-        name, authentication_status, username = render_login_section()
-    elif auth_tabs == 'Register':
-        render_registration_section()
-    elif auth_tabs == 'Guest Login':
-        name, authentication_status, username = render_guest_login_section()
-    else:  # Password Help
-        render_password_help_section()
-    
-    # If no authentication happened, get current session state
-    if authentication_status is None:
-        name = st.session_state.get('name')
-        authentication_status = st.session_state.get('authentication_status')
-        username = st.session_state.get('username')
-    
-    return name, authentication_status, username
-
-def render_login_section():
-    """Render main login section"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown("### 🔐 Login to Your Account")
-        
-        # Main login widget
-        authenticator.login()
-        
-        # Get authentication status
-        name = st.session_state.get('name')
-        authentication_status = st.session_state.get('authentication_status')
-        username = st.session_state.get('username')
-        
-        if authentication_status == False:
-            st.error("❌ Username/password is incorrect. Please try again.")
-            
-            # Show failed login attempts
-            failed_attempts = st.session_state.get('failed_login_attempts', {})
-            if username and username in failed_attempts:
-                st.warning(f"⚠️ Failed attempts: {failed_attempts[username]}")
-        
-        elif authentication_status == None:
-            st.info("ℹ️ Please enter your credentials to access the platform.")
-        
-        # 2FA option
-        st.markdown("---")
-        enable_2fa = st.checkbox("🔒 Enable Two-Factor Authentication", help="Requires email verification")
-        
-        if enable_2fa and authentication_status:
-            st.info("🔐 2FA is enabled for enhanced security")
-        
-        # Demo credentials
-        st.markdown("---")
-        st.markdown("**🔑 Demo Accounts:**")
-        
-        demo_info = sac.tabs([
-            sac.TabsItem(label='Free', icon='person'),
-            sac.TabsItem(label='Premium', icon='star'),
-            sac.TabsItem(label='Pro', icon='crown'),
-        ], index=0, key='demo_creds')
-        
-        if demo_info == 'Free':
-            st.code("Username: free_user\nPassword: free123\nFeatures: Basic analytics")
-        elif demo_info == 'Premium':
-            st.code("Username: premium_user\nPassword: premium123\nFeatures: Advanced analytics")
-        else:
-            st.code("Username: admin\nPassword: admin123\nFeatures: Full platform access")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    return name, authentication_status, username
-
-def render_registration_section():
-    """Render user registration section"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown("### ✨ Create New Account")
-        
-        # Registration options
-        registration_type = sac.segmented([
-            "Open Registration",
-            "Pre-authorized Only"
-        ], index=0, key='registration_type')
-        
-        if registration_type == "Open Registration":
-            st.info("📝 Anyone can register for a free account")
-            use_preauth = False
-        else:
-            st.info("🛡️ Only pre-authorized email addresses can register")
-            use_preauth = True
-            
-            st.markdown("**Pre-authorized emails:**")
-            for email in config['preauthorized']:
-                st.write(f"• {email}")
-        
-        # Registration widget with correct parameters
-        try:
-            # Check which parameters the register_user function accepts
-            st.markdown("#### 📝 Registration Form")
-            
-            # Try the registration with different parameter names
-            if use_preauth:
-                # For pre-authorized registration
-                try:
-                    if authenticator.register_user('Register User', preauthorization=True):
-                        st.success('✅ User registered successfully!')
-                        if save_config():
-                            st.success("Configuration updated!")
-                except TypeError:
-                    # Try alternative parameter name
-                    try:
-                        if authenticator.register_user('Register User', pre_authorization=True):
-                            st.success('✅ User registered successfully!')
-                            if save_config():
-                                st.success("Configuration updated!")
-                    except TypeError:
-                        # Try without parameter
-                        try:
-                            if authenticator.register_user('Register User'):
-                                st.success('✅ User registered successfully!')
-                                st.info("Note: Pre-authorization check not available in this version")
-                                if save_config():
-                                    st.success("Configuration updated!")
-                        except Exception as e:
-                            st.error(f"Registration error: {e}")
-                            st.info("Using manual registration form below as fallback")
-                            render_manual_registration_form()
-            else:
-                # For open registration
-                try:
-                    if authenticator.register_user('Register User', preauthorization=False):
-                        st.success('✅ User registered successfully!')
-                        if save_config():
-                            st.success("Configuration updated!")
-                except TypeError:
-                    # Try alternative parameter name
-                    try:
-                        if authenticator.register_user('Register User', pre_authorization=False):
-                            st.success('✅ User registered successfully!')
-                            if save_config():
-                                st.success("Configuration updated!")
-                    except TypeError:
-                        # Try without parameter
-                        try:
-                            if authenticator.register_user('Register User'):
-                                st.success('✅ User registered successfully!')
-                                if save_config():
-                                    st.success("Configuration updated!")
-                        except Exception as e:
-                            st.error(f"Registration error: {e}")
-                            st.info("Using manual registration form below as fallback")
-                            render_manual_registration_form()
-                
-        except Exception as e:
-            st.error(f"Registration widget error: {e}")
-            st.info("Using manual registration form as fallback")
-            render_manual_registration_form()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Return None values since registration doesn't log in automatically
-    return None, None, None
-
-def render_manual_registration_form():
-    """Manual registration form as fallback"""
-    st.markdown("---")
-    st.markdown("#### 📝 Manual Registration Form")
-    
-    with st.form("manual_registration"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            new_username = st.text_input("Username*", help="Choose a unique username")
-            new_first_name = st.text_input("First Name*")
-            new_email = st.text_input("Email*", help="Valid email address")
-        
-        with col2:
-            new_last_name = st.text_input("Last Name*")
-            new_password = st.text_input("Password*", type="password", help="Choose a strong password")
-            new_password_confirm = st.text_input("Confirm Password*", type="password")
-        
-        new_subscription = st.selectbox("Account Type", ['free', 'premium'], 
-                                       help="Start with free, upgrade anytime")
-        
-        agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy*")
-        
-        submit_registration = st.form_submit_button("🚀 Create Account", type="primary")
-        
-        if submit_registration:
-            # Validation
-            errors = []
-            
-            if not new_username:
-                errors.append("Username is required")
-            elif new_username in config['credentials']['usernames']:
-                errors.append("Username already exists")
-            
-            if not new_email:
-                errors.append("Email is required")
-            elif '@' not in new_email:
-                errors.append("Invalid email format")
-            
-            if not new_first_name:
-                errors.append("First name is required")
-            
-            if not new_last_name:
-                errors.append("Last name is required")
-            
-            if not new_password:
-                errors.append("Password is required")
-            elif len(new_password) < 6:
-                errors.append("Password must be at least 6 characters")
-            
-            if new_password != new_password_confirm:
-                errors.append("Passwords do not match")
-            
-            if not agree_terms:
-                errors.append("You must agree to the terms of service")
-            
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Create the user
-                if add_new_user_to_config(new_username, new_email, new_first_name, 
-                                        new_last_name, new_password, new_subscription):
-                    st.success("🎉 Account created successfully!")
-                    st.info("Please use the Login tab to sign in with your new account")
-                    st.balloons()
-                    
-                    # Clear the form by rerunning
-                    if st.button("Continue to Login"):
-                        st.rerun()
-                else:
-                    st.error("❌ Registration failed. Username may already exist.")
-
-def render_guest_login_section():
-    """Render guest login section"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    # Initialize return values
-    name = None
-    authentication_status = None
-    username = None
-    
-    with col2:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown("### 👤 Guest Access")
-        
-        st.markdown("#### Quick Demo Access")
-        st.info("🎯 Try the platform without creating an account")
-        
-        # Guest login options
-        guest_provider = sac.segmented([
-            "Google OAuth",
-            "Microsoft OAuth"
-        ], index=0, key='guest_provider')
-        
-        try:
-            if guest_provider == "Google OAuth":
-                if st.button("🔐 Login with Google", type="primary", use_container_width=True):
-                    # Demo OAuth - in production you'd configure real OAuth
-                    st.success("🎉 Demo: Google OAuth login successful!")
-                    st.session_state['authentication_status'] = True
-                    st.session_state['name'] = 'Guest User'
-                    st.session_state['username'] = 'guest_google'
-                    name = 'Guest User'
-                    authentication_status = True
-                    username = 'guest_google'
-            else:
-                if st.button("🔐 Login with Microsoft", type="primary", use_container_width=True):
-                    # Demo OAuth - in production you'd configure real OAuth
-                    st.success("🎉 Demo: Microsoft OAuth login successful!")
-                    st.session_state['authentication_status'] = True
-                    st.session_state['name'] = 'Guest User'
-                    st.session_state['username'] = 'guest_microsoft'
-                    name = 'Guest User'
-                    authentication_status = True
-                    username = 'guest_microsoft'
-                    
-        except Exception as e:
-            st.error(f"Guest login error: {e}")
-        
-        st.markdown("---")
-        st.markdown("**📋 Guest Account Features:**")
-        st.write("• 🔍 Limited analytics access")
-        st.write("• 📊 Basic charts and data")
-        st.write("• ⏰ 30-minute session limit")
-        st.write("• 🚫 No data export")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    return name, authentication_status, username
-
-def render_password_help_section():
-    """Render password help section"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown("### 🆘 Password & Username Help")
-        
-        help_tabs = sac.tabs([
-            sac.TabsItem(label='Reset Password', icon='key'),
-            sac.TabsItem(label='Forgot Username', icon='person-question'),
-            sac.TabsItem(label='Forgot Password', icon='unlock'),
-        ], key='help_tabs')
-        
-        if help_tabs == 'Reset Password':
-            st.markdown("#### 🔑 Reset Your Password")
-            st.info("ℹ️ For existing users who want to change their password")
-            
-            # Check if user is authenticated first
-            if st.session_state.get('authentication_status'):
-                username = st.session_state.get('username')
-                try:
-                    if authenticator.reset_password(username, 'Reset password'):
-                        st.success('✅ Password modified successfully')
-                        if save_config():
-                            st.success("Changes saved!")
-                except Exception as e:
-                    st.error(f"Password reset error: {e}")
-            else:
-                st.warning("🔐 Please login first to reset your password")
-        
-        elif help_tabs == 'Forgot Username':
-            st.markdown("#### 👤 Recover Your Username")
-            st.info("📧 Enter your email to receive your username")
-            
-            try:
-                enable_email = st.checkbox("📨 Send username via email", key='username_email')
-                
-                username_forgot_username, email_forgot_username = authenticator.forgot_username(
-                    'Forgot username',
-                    send_email=enable_email
-                )
-                
-                if username_forgot_username:
-                    st.success('✅ Username found!')
-                    if enable_email:
-                        st.info('📧 Username sent to your email')
-                    else:
-                        st.info(f'👤 Your username is: **{username_forgot_username}**')
-                elif username_forgot_username == False:
-                    st.error('❌ Email not found in our system')
-                    
-            except Exception as e:
-                st.error(f"Username recovery error: {e}")
-        
-        else:  # Forgot Password
-            st.markdown("#### 🔓 Recover Your Password")
-            st.info("🔐 Generate a new secure password")
-            
-            try:
-                enable_email = st.checkbox("📨 Send new password via email", key='password_email')
-                
-                username_forgot_pw, email_forgot_password, random_password = authenticator.forgot_password(
-                    'Forgot password',
-                    send_email=enable_email
-                )
-                
-                if username_forgot_pw:
-                    st.success('✅ New password generated!')
-                    if enable_email:
-                        st.info('📧 New password sent securely to your email')
-                    else:
-                        st.info('🔑 Please check your email for the new password')
-                        
-                    if save_config():
-                        st.success("Password updated!")
-                        
-                elif username_forgot_pw == False:
-                    st.error('❌ Username not found')
-                    
-            except Exception as e:
-                st.error(f"Password recovery error: {e}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Return None values since password help doesn't log in
-    return None, None, None
-
-def show_main_app(name, username):
-    """Enhanced main application with user management"""
-    subscription_level = get_user_subscription(username)
-    
-    # Header with user info
-    st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
-    with col1:
-        st.markdown("# 💎 Kaspa Analytics Pro")
-        st.markdown("*Professional blockchain analysis platform*")
-    
-    with col2:
-        st.markdown(f"**Welcome, {name}!**")
-        if subscription_level == 'free':
-            st.markdown('<span class="free-badge">FREE USER</span>', unsafe_allow_html=True)
-        elif subscription_level == 'premium':
-            st.markdown('<span class="premium-badge">PREMIUM</span>', unsafe_allow_html=True)
-        else:
-            st.markdown('<span class="pro-badge">PRO</span>', unsafe_allow_html=True)
-    
-    with col3:
-        logout_col1, logout_col2 = st.columns(2)
-        with logout_col1:
-            if st.button("⚙️ Profile", type="secondary"):
-                st.session_state.show_profile = True
-                st.rerun()
-        with logout_col2:
-            if st.button("🚪 Logout", type="secondary"):
-                # Manual logout by clearing session state
-                for key in ['authentication_status', 'name', 'username', 'logout']:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
-                # Also try the authenticator logout
-                try:
-                    authenticator.logout()
-                except:
-                    pass  # Continue with manual logout if authenticator fails
-                
-                # Clear any other auth-related session state
-                if 'show_profile' in st.session_state:
-                    del st.session_state['show_profile']
-                
-                # Force rerun to show login page
-                st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
     # Check if user wants to see profile
     if st.session_state.get('show_profile'):
         render_user_profile(name, username)
@@ -1095,4 +649,420 @@ def main():
 
 # Run the application
 if __name__ == "__main__":
-    main()
+    main()# Authentication tabs
+    auth_tabs = sac.tabs([
+        sac.TabsItem(label='Login', icon='box-arrow-in-right'),
+        sac.TabsItem(label='Register', icon='person-plus'),
+        sac.TabsItem(label='Guest Login', icon='person-circle'),
+        sac.TabsItem(label='Password Help', icon='question-circle'),
+    ], index=0, key='auth_tabs')
+    
+    # Initialize return values
+    name = None
+    authentication_status = None
+    username = None
+    
+    if auth_tabs == 'Login':
+        name, authentication_status, username = render_login_section()
+    elif auth_tabs == 'Register':
+        render_registration_section()
+    elif auth_tabs == 'Guest Login':
+        name, authentication_status, username = render_guest_login_section()
+    else:  # Password Help
+        render_password_help_section()
+    
+    # If no authentication happened, get current session state
+    if authentication_status is None:
+        name = st.session_state.get('name')
+        authentication_status = st.session_state.get('authentication_status')
+        username = st.session_state.get('username')
+    
+    return name, authentication_status, username
+
+def render_login_section():
+    """Render main login section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Login to Your Account")
+        
+        # Main login widget
+        authenticator.login()
+        
+        # Get authentication status
+        name = st.session_state.get('name')
+        authentication_status = st.session_state.get('authentication_status')
+        username = st.session_state.get('username')
+        
+        if authentication_status == False:
+            st.error("❌ Username/password is incorrect. Please try again.")
+            
+            # Show failed login attempts
+            failed_attempts = st.session_state.get('failed_login_attempts', {})
+            if username and username in failed_attempts:
+                st.warning(f"⚠️ Failed attempts: {failed_attempts[username]}")
+        
+        elif authentication_status == None:
+            st.info("ℹ️ Please enter your credentials to access the platform.")
+        
+        # 2FA option
+        st.markdown("---")
+        enable_2fa = st.checkbox("🔒 Enable Two-Factor Authentication", help="Requires email verification")
+        
+        if enable_2fa and authentication_status:
+            st.info("🔐 2FA is enabled for enhanced security")
+        
+        # Demo credentials
+        st.markdown("---")
+        st.markdown("**🔑 Demo Accounts:**")
+        
+        demo_info = sac.tabs([
+            sac.TabsItem(label='Free', icon='person'),
+            sac.TabsItem(label='Premium', icon='star'),
+            sac.TabsItem(label='Pro', icon='crown'),
+        ], index=0, key='demo_creds')
+        
+        if demo_info == 'Free':
+            st.code("Username: free_user\nPassword: free123\nFeatures: Basic analytics")
+        elif demo_info == 'Premium':
+            st.code("Username: premium_user\nPassword: premium123\nFeatures: Advanced analytics")
+        else:
+            st.code("Username: admin\nPassword: admin123\nFeatures: Full platform access")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    return name, authentication_status, username
+
+def render_registration_section():
+    """Render user registration section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### ✨ Create New Account")
+        
+        # Registration options
+        registration_type = sac.segmented([
+            "Open Registration",
+            "Pre-authorized Only"
+        ], index=0, key='registration_type')
+        
+        if registration_type == "Open Registration":
+            st.info("📝 Anyone can register for a free account")
+            use_preauth = False
+        else:
+            st.info("🛡️ Only pre-authorized email addresses can register")
+            use_preauth = True
+            
+            st.markdown("**Pre-authorized emails:**")
+            for email in config['preauthorized']:
+                st.write(f"• {email}")
+        
+        # Registration widget with correct parameters
+        try:
+            st.markdown("#### 📝 Registration Form")
+            
+            # Use the correct streamlit-authenticator parameters
+            if use_preauth:
+                # For pre-authorized registration - include location and preauthorization parameters
+                try:
+                    if authenticator.register_user(form_name='Register User', location='main', preauthorization=True):
+                        st.success('✅ User registered successfully!')
+                        if save_config():
+                            st.success("Configuration updated!")
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"Pre-authorized registration error: {e}")
+                    st.info("Using manual registration form as fallback")
+                    render_manual_registration_form()
+            else:
+                # For open registration - include location parameter
+                try:
+                    if authenticator.register_user(form_name='Register User', location='main', preauthorization=False):
+                        st.success('✅ User registered successfully!')
+                        if save_config():
+                            st.success("Configuration updated!")
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"Open registration error: {e}")
+                    st.info("Using manual registration form as fallback")
+                    render_manual_registration_form()
+                
+        except Exception as e:
+            st.error(f"Registration widget error: {e}")
+            st.info("Using manual registration form as fallback")
+            render_manual_registration_form()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Return None values since registration doesn't log in automatically
+    return None, None, None
+
+def render_manual_registration_form():
+    """Manual registration form as fallback"""
+    st.markdown("---")
+    st.markdown("#### 📝 Manual Registration Form")
+    
+    with st.form("manual_registration"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            new_username = st.text_input("Username*", help="Choose a unique username")
+            new_first_name = st.text_input("First Name*")
+            new_email = st.text_input("Email*", help="Valid email address")
+        
+        with col2:
+            new_last_name = st.text_input("Last Name*")
+            new_password = st.text_input("Password*", type="password", help="Choose a strong password")
+            new_password_confirm = st.text_input("Confirm Password*", type="password")
+        
+        new_subscription = st.selectbox("Account Type", ['free', 'premium'], 
+                                       help="Start with free, upgrade anytime")
+        
+        agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy*")
+        
+        submit_registration = st.form_submit_button("🚀 Create Account", type="primary")
+        
+        if submit_registration:
+            # Validation
+            errors = []
+            
+            if not new_username:
+                errors.append("Username is required")
+            elif new_username in config['credentials']['usernames']:
+                errors.append("Username already exists")
+            
+            if not new_email:
+                errors.append("Email is required")
+            elif '@' not in new_email:
+                errors.append("Invalid email format")
+            
+            if not new_first_name:
+                errors.append("First name is required")
+            
+            if not new_last_name:
+                errors.append("Last name is required")
+            
+            if not new_password:
+                errors.append("Password is required")
+            elif len(new_password) < 6:
+                errors.append("Password must be at least 6 characters")
+            
+            if new_password != new_password_confirm:
+                errors.append("Passwords do not match")
+            
+            if not agree_terms:
+                errors.append("You must agree to the terms of service")
+            
+            if errors:
+                for error in errors:
+                    st.error(f"❌ {error}")
+            else:
+                # Create the user
+                if add_new_user_to_config(new_username, new_email, new_first_name, 
+                                        new_last_name, new_password, new_subscription):
+                    st.success("🎉 Account created successfully!")
+                    st.info("Please use the Login tab to sign in with your new account")
+                    st.balloons()
+                    
+                    # Clear the form by rerunning
+                    if st.button("Continue to Login"):
+                        st.rerun()
+                else:
+                    st.error("❌ Registration failed. Username may already exist.")
+
+def render_guest_login_section():
+    """Render guest login section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    # Initialize return values
+    name = None
+    authentication_status = None
+    username = None
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 👤 Guest Access")
+        
+        st.markdown("#### Quick Demo Access")
+        st.info("🎯 Try the platform without creating an account")
+        
+        # Guest login options
+        guest_provider = sac.segmented([
+            "Google OAuth",
+            "Microsoft OAuth"
+        ], index=0, key='guest_provider')
+        
+        try:
+            if guest_provider == "Google OAuth":
+                if st.button("🔐 Login with Google", type="primary", use_container_width=True):
+                    # Demo OAuth - in production you'd configure real OAuth
+                    st.success("🎉 Demo: Google OAuth login successful!")
+                    st.session_state['authentication_status'] = True
+                    st.session_state['name'] = 'Guest User'
+                    st.session_state['username'] = 'guest_google'
+                    name = 'Guest User'
+                    authentication_status = True
+                    username = 'guest_google'
+            else:
+                if st.button("🔐 Login with Microsoft", type="primary", use_container_width=True):
+                    # Demo OAuth - in production you'd configure real OAuth
+                    st.success("🎉 Demo: Microsoft OAuth login successful!")
+                    st.session_state['authentication_status'] = True
+                    st.session_state['name'] = 'Guest User'
+                    st.session_state['username'] = 'guest_microsoft'
+                    name = 'Guest User'
+                    authentication_status = True
+                    username = 'guest_microsoft'
+                    
+        except Exception as e:
+            st.error(f"Guest login error: {e}")
+        
+        st.markdown("---")
+        st.markdown("**📋 Guest Account Features:**")
+        st.write("• 🔍 Limited analytics access")
+        st.write("• 📊 Basic charts and data")
+        st.write("• ⏰ 30-minute session limit")
+        st.write("• 🚫 No data export")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    return name, authentication_status, username
+
+def render_password_help_section():
+    """Render password help section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 🆘 Password & Username Help")
+        
+        help_tabs = sac.tabs([
+            sac.TabsItem(label='Reset Password', icon='key'),
+            sac.TabsItem(label='Forgot Username', icon='person-question'),
+            sac.TabsItem(label='Forgot Password', icon='unlock'),
+        ], key='help_tabs')
+        
+        if help_tabs == 'Reset Password':
+            st.markdown("#### 🔑 Reset Your Password")
+            st.info("ℹ️ For existing users who want to change their password")
+            
+            # Check if user is authenticated first
+            if st.session_state.get('authentication_status'):
+                username = st.session_state.get('username')
+                try:
+                    if authenticator.reset_password(username, 'Reset password'):
+                        st.success('✅ Password modified successfully')
+                        if save_config():
+                            st.success("Changes saved!")
+                except Exception as e:
+                    st.error(f"Password reset error: {e}")
+            else:
+                st.warning("🔐 Please login first to reset your password")
+        
+        elif help_tabs == 'Forgot Username':
+            st.markdown("#### 👤 Recover Your Username")
+            st.info("📧 Enter your email to receive your username")
+            
+            try:
+                enable_email = st.checkbox("📨 Send username via email", key='username_email')
+                
+                username_forgot_username, email_forgot_username = authenticator.forgot_username(
+                    'Forgot username',
+                    send_email=enable_email
+                )
+                
+                if username_forgot_username:
+                    st.success('✅ Username found!')
+                    if enable_email:
+                        st.info('📧 Username sent to your email')
+                    else:
+                        st.info(f'👤 Your username is: **{username_forgot_username}**')
+                elif username_forgot_username == False:
+                    st.error('❌ Email not found in our system')
+                    
+            except Exception as e:
+                st.error(f"Username recovery error: {e}")
+        
+        else:  # Forgot Password
+            st.markdown("#### 🔓 Recover Your Password")
+            st.info("🔐 Generate a new secure password")
+            
+            try:
+                enable_email = st.checkbox("📨 Send new password via email", key='password_email')
+                
+                username_forgot_pw, email_forgot_password, random_password = authenticator.forgot_password(
+                    'Forgot password',
+                    send_email=enable_email
+                )
+                
+                if username_forgot_pw:
+                    st.success('✅ New password generated!')
+                    if enable_email:
+                        st.info('📧 New password sent securely to your email')
+                    else:
+                        st.info('🔑 Please check your email for the new password')
+                        
+                    if save_config():
+                        st.success("Password updated!")
+                        
+                elif username_forgot_pw == False:
+                    st.error('❌ Username not found')
+                    
+            except Exception as e:
+                st.error(f"Password recovery error: {e}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Return None values since password help doesn't log in
+    return None, None, None
+
+def show_main_app(name, username):
+    """Enhanced main application with user management"""
+    subscription_level = get_user_subscription(username)
+    
+    # Header with user info
+    st.markdown('<div class="main-header">', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        st.markdown("# 💎 Kaspa Analytics Pro")
+        st.markdown("*Professional blockchain analysis platform*")
+    
+    with col2:
+        st.markdown(f"**Welcome, {name}!**")
+        if subscription_level == 'free':
+            st.markdown('<span class="free-badge">FREE USER</span>', unsafe_allow_html=True)
+        elif subscription_level == 'premium':
+            st.markdown('<span class="premium-badge">PREMIUM</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span class="pro-badge">PRO</span>', unsafe_allow_html=True)
+    
+    with col3:
+        logout_col1, logout_col2 = st.columns(2)
+        with logout_col1:
+            if st.button("⚙️ Profile", type="secondary"):
+                st.session_state.show_profile = True
+                st.rerun()
+        with logout_col2:
+            if st.button("🚪 Logout", type="secondary"):
+                # Manual logout by clearing session state
+                for key in ['authentication_status', 'name', 'username', 'logout']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                # Also try the authenticator logout
+                try:
+                    authenticator.logout()
+                except:
+                    pass  # Continue with manual logout if authenticator fails
+                
+                # Clear any other auth-related session state
+                if 'show_profile' in st.session_state:
+                    del st.session_state['show_profile']
+                
+                # Force rerun to show login page
+                st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
