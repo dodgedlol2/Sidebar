@@ -745,6 +745,9 @@ def render_user_profile(name, username):
     
     subscription_level = get_user_subscription(username)
     
+    # Get user info from config
+    user_info = config['credentials']['usernames'].get(username, {})
+    
     profile_tabs = sac.tabs([
         sac.TabsItem(label='Profile Info', icon='person-circle'),
         sac.TabsItem(label='Security', icon='shield-check'),
@@ -765,8 +768,6 @@ def render_user_profile(name, username):
             st.error(f"Profile update error: {e}")
         
         # Display current info
-        user_info = config['credentials']['usernames'].get(username, {})
-        
         col1, col2 = st.columns(2)
         with col1:
             st.write(f"**Full Name:** {user_info.get('first_name', '')} {user_info.get('last_name', '')}")
