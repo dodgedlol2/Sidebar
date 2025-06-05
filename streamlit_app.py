@@ -642,7 +642,7 @@ def render_guest_login_section():
     return name, authentication_status, username
 
 def render_password_help_section():
-    """Render password help section"""
+    """Render password help section with improved functionality"""
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
@@ -657,7 +657,7 @@ def render_password_help_section():
         
         if help_tabs == 'Reset Password':
             st.markdown("#### 🔑 Reset Your Password")
-            st.info("ℹ️ For existing users who want to change their password")
+            st.info("ℹ️ For logged-in users who want to change their password")
             
             # Check if user is authenticated first
             if st.session_state.get('authentication_status'):
@@ -669,56 +669,79 @@ def render_password_help_section():
                             st.success("Changes saved!")
                 except Exception as e:
                     st.error(f"Password reset error: {e}")
+                    st.info("Password reset feature may not be available in this version")
             else:
                 st.warning("🔐 Please login first to reset your password")
+                st.info("Or use 'Forgot Password' if you can't log in")
         
         elif help_tabs == 'Forgot Username':
             st.markdown("#### 👤 Recover Your Username")
-            st.info("📧 Enter your email to receive your username")
+            st.info("📧 Find your username using your email address")
             
-            try:
-                enable_email = st.checkbox("📨 Send username via email", key='username_email')
+            with st.form("forgot_username_form"):
+                email_input = st.text_input("Enter your email address:", placeholder="your-email@example.com")
+                submit_username_recovery = st.form_submit_button("🔍 Find Username")
+            
+            if submit_username_recovery and email_input:
+                # Manual username search
+                found_username = None
+                for username, user_info in config['credentials']['usernames'].items():
+                    if user_info.get('email', '').lower() == email_input.lower():
+                        found_username = username
+                        break
                 
-                try:
-                    username_forgot_username, email_forgot_username = authenticator.forgot_username('Forgot username')
-                    
-                    if username_forgot_username:
-                        st.success('✅ Username found!')
-                        st.info(f'👤 Your username is: **{username_forgot_username}**')
-                    elif username_forgot_username == False:
-                        st.error('❌ Email not found in our system')
-                except TypeError:
-                    # Handle different function signatures
-                    st.info("📧 Username recovery feature may have limited functionality in this version")
-                    
-            except Exception as e:
-                st.error(f"Username recovery error: {e}")
+                if found_username:
+                    st.success('✅ Username found!')
+                    st.info(f'👤 Your username is: **{found_username}**')
+                    st.markdown("Now you can use the Login tab with this username.")
+                else:
+                    st.error('❌ No account found with this email address')
+                    st.info("Please check your email or register a new account")
         
         else:  # Forgot Password
             st.markdown("#### 🔓 Recover Your Password")
-            st.info("🔐 Generate a new secure password")
+            st.info("🔐 Reset your password using your username")
             
-            try:
-                enable_email = st.checkbox("📨 Send new password via email", key='password_email')
-                
-                try:
-                    username_forgot_pw, email_forgot_password, random_password = authenticator.forgot_password('Forgot password')
-                    
-                    if username_forgot_pw:
-                        st.success('✅ New password generated!')
-                        st.info('🔑 Please check your email for the new password')
+            with st.form("forgot_password_form"):
+                username_input = st.text_input("Enter your username:", placeholder="your-username")
+                new_password = st.text_input("Enter new password:", type="password", placeholder="New password")
+                confirm_password = st.text_input("Confirm new password:", type="password", placeholder="Confirm password")
+                submit_password_reset = st.form_submit_button("🔄 Reset Password")
+            
+            if submit_password_reset and username_input and new_password:
+                # Validation
+                if new_password != confirm_password:
+                    st.error("❌ Passwords do not match")
+                elif len(new_password) < 6:
+                    st.error("❌ Password must be at least 6 characters")
+                elif username_input not in config['credentials']['usernames']:
+                    st.error('❌ Username not found')
+                else:
+                    # Reset password manually
+                    try:
+                        import bcrypt
+                        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                         
-                        if save_config():
-                            st.success("Password updated!")
-                            
-                    elif username_forgot_pw == False:
-                        st.error('❌ Username not found')
-                except TypeError:
-                    # Handle different function signatures
-                    st.info("📧 Password recovery feature may have limited functionality in this version")
-                    
-            except Exception as e:
-                st.error(f"Password recovery error: {e}")
+                        # Update password in config
+                        st.session_state.config['credentials']['usernames'][username_input]['password'] = hashed_password
+                        
+                        # Update global config
+                        global config
+                        config = st.session_state.config
+                        
+                        st.success('✅ Password reset successfully!')
+                        st.info('🔑 You can now login with your new password')
+                        st.balloons()
+                        
+                        # Show user info for confirmation
+                        user_info = config['credentials']['usernames'][username_input]
+                        st.markdown("#### ✅ Reset Confirmation:")
+                        st.write(f"**Username:** {username_input}")
+                        st.write(f"**Email:** {user_info.get('email', 'Not set')}")
+                        st.write(f"**Name:** {user_info.get('first_name', '')} {user_info.get('last_name', '')}")
+                        
+                    except Exception as e:
+                        st.error(f"Error resetting password: {e}")
         
         st.markdown('</div>', unsafe_allow_html=True)
     
