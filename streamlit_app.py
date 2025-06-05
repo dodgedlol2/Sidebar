@@ -162,8 +162,6 @@ def save_config():
 # Admin panel for user management (Streamlit Cloud compatible)
 def render_admin_panel():
     """Admin panel for user management - works in Streamlit Cloud"""
-    global config  # Add global declaration
-    
     if st.session_state.get('username') != 'admin':
         st.error("🔒 Access denied. Admin only.")
         return
@@ -180,7 +178,7 @@ def render_admin_panel():
         st.subheader("👥 Current Users")
         
         # Display current users
-        for username, user_info in config['credentials']['usernames'].items():
+        for username, user_info in st.session_state.config['credentials']['usernames'].items():
             with st.expander(f"👤 {username} ({user_info.get('subscription', 'free')})"):
                 col1, col2, col3 = st.columns(3)
                 
@@ -234,10 +232,10 @@ def render_admin_panel():
     else:  # System Stats
         st.subheader("📊 System Statistics")
         
-        total_users = len(config['credentials']['usernames'])
+        total_users = len(st.session_state.config['credentials']['usernames'])
         subscription_counts = {}
         
-        for user_info in config['credentials']['usernames'].values():
+        for user_info in st.session_state.config['credentials']['usernames'].values():
             sub = user_info.get('subscription', 'free')
             subscription_counts[sub] = subscription_counts.get(sub, 0) + 1
         
@@ -353,7 +351,10 @@ def fetch_kaspa_price_data():
 
 def get_user_subscription(username):
     """Get user subscription level"""
-    user_config = config['credentials']['usernames'].get(username, {})
+    if 'config' not in st.session_state:
+        st.session_state.config = get_auth_config()
+    
+    user_config = st.session_state.config['credentials']['usernames'].get(username, {})
     return user_config.get('subscription', 'free')
 
 def show_authentication_page():
@@ -884,14 +885,12 @@ def show_main_app(name, username):
 
 def render_user_profile(name, username):
     """Enhanced user profile with update capabilities"""
-    global config  # Add global declaration
-    
     st.title("👤 User Profile & Settings")
     
     subscription_level = get_user_subscription(username)
     
     # Get user info from config
-    user_info = config['credentials']['usernames'].get(username, {})
+    user_info = st.session_state.config['credentials']['usernames'].get(username, {})
     
     profile_tabs = sac.tabs([
         sac.TabsItem(label='Profile Info', icon='person-circle'),
