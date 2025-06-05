@@ -471,35 +471,21 @@ def render_registration_section():
             for email in config['preauthorized']:
                 st.write(f"• {email}")
         
-        # Registration widget with correct parameters
+        # Registration widget with maximum compatibility
         try:
             st.markdown("#### 📝 Registration Form")
             
-            # Use the correct streamlit-authenticator parameters (simplified for compatibility)
-            if use_preauth:
-                # For pre-authorized registration
-                try:
-                    if authenticator.register_user('Register User', preauthorization=True):
-                        st.success('✅ User registered successfully!')
-                        if save_config():
-                            st.success("Configuration updated!")
-                            st.rerun()
-                except Exception as e:
-                    st.error(f"Pre-authorized registration error: {e}")
-                    st.info("Using manual registration form as fallback")
-                    render_manual_registration_form()
-            else:
-                # For open registration
-                try:
-                    if authenticator.register_user('Register User', preauthorization=False):
-                        st.success('✅ User registered successfully!')
-                        if save_config():
-                            st.success("Configuration updated!")
-                            st.rerun()
-                except Exception as e:
-                    st.error(f"Open registration error: {e}")
-                    st.info("Using manual registration form as fallback")
-                    render_manual_registration_form()
+            # Try the most basic registration call first
+            try:
+                if authenticator.register_user('Register User'):
+                    st.success('✅ User registered successfully!')
+                    if save_config():
+                        st.success("Configuration updated!")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"Registration error: {e}")
+                st.info("Using manual registration form as fallback")
+                render_manual_registration_form()
                 
         except Exception as e:
             st.error(f"Registration widget error: {e}")
