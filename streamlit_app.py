@@ -335,20 +335,23 @@ def show_login_prompt(feature_name="this feature"):
     
     col1, col2, col3 = st.columns([1, 1, 1])
     
+    # Use feature_name to create unique keys
+    safe_feature_name = feature_name.replace(" ", "_").replace("-", "_")
+    
     with col1:
-        if st.button("🚀 Create Free Account", type="primary", use_container_width=True):
+        if st.button("🚀 Create Free Account", type="primary", use_container_width=True, key=f"create_account_{safe_feature_name}"):
             st.session_state.show_auth = True
             st.session_state.auth_tab = 'Register'
             st.rerun()
     
     with col2:
-        if st.button("🔑 Login", use_container_width=True):
+        if st.button("🔑 Login", use_container_width=True, key=f"login_{safe_feature_name}"):
             st.session_state.show_auth = True
             st.session_state.auth_tab = 'Login'
             st.rerun()
     
     with col3:
-        if st.button("ℹ️ Learn More", use_container_width=True):
+        if st.button("ℹ️ Learn More", use_container_width=True, key=f"learn_more_{safe_feature_name}"):
             st.session_state.show_auth = True
             st.session_state.auth_tab = 'Pricing'
             st.rerun()
@@ -370,12 +373,12 @@ def show_upgrade_prompt(current_subscription, required_subscription):
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button(f"⬆️ Upgrade to {required_subscription.title()}", type="primary", use_container_width=True):
+        if st.button(f"⬆️ Upgrade to {required_subscription.title()}", type="primary", use_container_width=True, key=f"upgrade_to_{required_subscription}_{current_subscription}"):
             st.balloons()
             st.success(f"Redirecting to {required_subscription} upgrade...")
     
     with col2:
-        if st.button("📋 View All Features", use_container_width=True):
+        if st.button("📋 View All Features", use_container_width=True, key=f"view_features_{required_subscription}_{current_subscription}"):
             st.session_state.show_pricing = True
             st.rerun()
     
@@ -398,12 +401,12 @@ def render_public_header():
     with col3:
         col3a, col3b = st.columns(2)
         with col3a:
-            if st.button("🔑 Login", type="secondary", use_container_width=True):
+            if st.button("🔑 Login", type="secondary", use_container_width=True, key="header_login"):
                 st.session_state.show_auth = True
                 st.session_state.auth_tab = 'Login'
                 st.rerun()
         with col3b:
-            if st.button("🚀 Sign Up", type="primary", use_container_width=True):
+            if st.button("🚀 Sign Up", type="primary", use_container_width=True, key="header_signup"):
                 st.session_state.show_auth = True
                 st.session_state.auth_tab = 'Register'
                 st.rerun()
@@ -432,11 +435,11 @@ def render_authenticated_header(user):
     with col3:
         logout_col1, logout_col2 = st.columns(2)
         with logout_col1:
-            if st.button("⚙️ Profile", type="secondary"):
+            if st.button("⚙️ Profile", type="secondary", key="header_profile"):
                 st.session_state.show_profile = True
                 st.rerun()
         with logout_col2:
-            if st.button("🚪 Logout", type="secondary"):
+            if st.button("🚪 Logout", type="secondary", key="header_logout"):
                 # Manual logout by clearing session state
                 for key in ['authentication_status', 'name', 'username', 'logout']:
                     if key in st.session_state:
@@ -495,7 +498,7 @@ def render_public_sidebar():
         st.markdown("• Historical data")
         st.markdown("• Export capabilities")
         
-        if st.button("🚀 Start Free Trial", type="primary", use_container_width=True):
+        if st.button("🚀 Start Free Trial", type="primary", use_container_width=True, key="sidebar_free_trial"):
             st.session_state.show_auth = True
             st.session_state.auth_tab = 'Register'
             st.rerun()
@@ -593,7 +596,7 @@ def show_authentication_page():
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        if st.button("← Back to Public Site", use_container_width=True):
+        if st.button("← Back to Public Site", use_container_width=True, key="auth_back_to_public"):
             # Clear auth display flags
             for key in ['show_auth', 'auth_tab']:
                 if key in st.session_state:
@@ -753,7 +756,7 @@ def render_pricing_page():
         st.write("• Simple power law analysis")
         st.write("• Community support")
         st.markdown("---")
-        if st.button("🚀 Get Started Free", use_container_width=True):
+        if st.button("🚀 Get Started Free", use_container_width=True, key="pricing_free"):
             st.session_state.auth_tab = 'Register'
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -771,7 +774,7 @@ def render_pricing_page():
         st.write("• Network metrics analysis")
         st.write("• Email support")
         st.markdown("---")
-        if st.button("⭐ Upgrade to Premium", type="primary", use_container_width=True):
+        if st.button("⭐ Upgrade to Premium", type="primary", use_container_width=True, key="pricing_premium"):
             st.balloons()
             st.success("Redirecting to premium signup...")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -789,7 +792,7 @@ def render_pricing_page():
         st.write("• Priority support")
         st.write("• White-label reports")
         st.markdown("---")
-        if st.button("👑 Go Pro", use_container_width=True):
+        if st.button("👑 Go Pro", use_container_width=True, key="pricing_pro"):
             st.balloons()
             st.success("Redirecting to pro signup...")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -936,7 +939,7 @@ def render_public_overview():
         st.markdown("• Technical analysis tools")
         st.markdown("• Basic power law analysis")
         
-        if st.button("🚀 Create Free Account", type="primary", use_container_width=True):
+        if st.button("🚀 Create Free Account", type="primary", use_container_width=True, key="overview_create_account"):
             st.session_state.show_auth = True
             st.session_state.auth_tab = 'Register'
             st.rerun()
@@ -958,7 +961,7 @@ def render_public_overview():
         st.write("🔒 Data export")
         st.write("🔒 Advanced analytics")
         
-        if st.button("📋 View All Features", use_container_width=True):
+        if st.button("📋 View All Features", use_container_width=True, key="overview_view_features"):
             st.session_state.show_auth = True
             st.session_state.auth_tab = 'Features'
             st.rerun()
@@ -1353,7 +1356,7 @@ def main():
 def render_user_profile(name, username):
     st.title("👤 User Profile")
     st.write(f"Welcome {name}!")
-    if st.button("← Back to Dashboard"):
+    if st.button("← Back to Dashboard", key="profile_back"):
         st.session_state.show_profile = False
         st.rerun()
 
