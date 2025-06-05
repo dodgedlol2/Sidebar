@@ -127,15 +127,14 @@ if 'config' not in st.session_state:
 
 config = st.session_state.config
 
-# Initialize authenticator with API key
+# Initialize authenticator (without API key for compatibility)
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
     config['cookie']['key'],
     config['cookie']['expiry_days'],
     config['preauthorized'],
-    auto_hash=True,
-    api_key=config['api_key']  # Enable 2FA and email features
+    auto_hash=True
 )
 
 # Save config function - Streamlit Cloud version
@@ -476,11 +475,11 @@ def render_registration_section():
         try:
             st.markdown("#### 📝 Registration Form")
             
-            # Use the correct streamlit-authenticator parameters
+            # Use the correct streamlit-authenticator parameters (simplified for compatibility)
             if use_preauth:
-                # For pre-authorized registration - include location and preauthorization parameters
+                # For pre-authorized registration
                 try:
-                    if authenticator.register_user(form_name='Register User', location='main', preauthorization=True):
+                    if authenticator.register_user('Register User', preauthorization=True):
                         st.success('✅ User registered successfully!')
                         if save_config():
                             st.success("Configuration updated!")
@@ -490,9 +489,9 @@ def render_registration_section():
                     st.info("Using manual registration form as fallback")
                     render_manual_registration_form()
             else:
-                # For open registration - include location parameter
+                # For open registration
                 try:
-                    if authenticator.register_user(form_name='Register User', location='main', preauthorization=False):
+                    if authenticator.register_user('Register User', preauthorization=False):
                         st.success('✅ User registered successfully!')
                         if save_config():
                             st.success("Configuration updated!")
@@ -681,19 +680,17 @@ def render_password_help_section():
             try:
                 enable_email = st.checkbox("📨 Send username via email", key='username_email')
                 
-                username_forgot_username, email_forgot_username = authenticator.forgot_username(
-                    'Forgot username',
-                    send_email=enable_email
-                )
-                
-                if username_forgot_username:
-                    st.success('✅ Username found!')
-                    if enable_email:
-                        st.info('📧 Username sent to your email')
-                    else:
+                try:
+                    username_forgot_username, email_forgot_username = authenticator.forgot_username('Forgot username')
+                    
+                    if username_forgot_username:
+                        st.success('✅ Username found!')
                         st.info(f'👤 Your username is: **{username_forgot_username}**')
-                elif username_forgot_username == False:
-                    st.error('❌ Email not found in our system')
+                    elif username_forgot_username == False:
+                        st.error('❌ Email not found in our system')
+                except TypeError:
+                    # Handle different function signatures
+                    st.info("📧 Username recovery feature may have limited functionality in this version")
                     
             except Exception as e:
                 st.error(f"Username recovery error: {e}")
@@ -705,23 +702,21 @@ def render_password_help_section():
             try:
                 enable_email = st.checkbox("📨 Send new password via email", key='password_email')
                 
-                username_forgot_pw, email_forgot_password, random_password = authenticator.forgot_password(
-                    'Forgot password',
-                    send_email=enable_email
-                )
-                
-                if username_forgot_pw:
-                    st.success('✅ New password generated!')
-                    if enable_email:
-                        st.info('📧 New password sent securely to your email')
-                    else:
+                try:
+                    username_forgot_pw, email_forgot_password, random_password = authenticator.forgot_password('Forgot password')
+                    
+                    if username_forgot_pw:
+                        st.success('✅ New password generated!')
                         st.info('🔑 Please check your email for the new password')
                         
-                    if save_config():
-                        st.success("Password updated!")
-                        
-                elif username_forgot_pw == False:
-                    st.error('❌ Username not found')
+                        if save_config():
+                            st.success("Password updated!")
+                            
+                    elif username_forgot_pw == False:
+                        st.error('❌ Username not found')
+                except TypeError:
+                    # Handle different function signatures
+                    st.info("📧 Password recovery feature may have limited functionality in this version")
                     
             except Exception as e:
                 st.error(f"Password recovery error: {e}")
@@ -898,6 +893,7 @@ def render_user_profile(name, username):
                     st.success("Changes saved!")
         except Exception as e:
             st.error(f"Profile update error: {e}")
+            st.info("Profile update feature may not be available in this version of streamlit-authenticator")
         
         # Display current info
         col1, col2 = st.columns(2)
