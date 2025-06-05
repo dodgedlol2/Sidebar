@@ -471,26 +471,10 @@ def render_registration_section():
             for email in config['preauthorized']:
                 st.write(f"• {email}")
         
-        # Registration widget with captcha disabled
-        try:
-            st.markdown("#### 📝 Registration Form")
-            
-            # Try with captcha disabled
-            try:
-                if authenticator.register_user(location='main', captcha=False):
-                    st.success('✅ User registered successfully!')
-                    if save_config():
-                        st.success("Configuration updated!")
-                        st.rerun()
-            except Exception as e:
-                st.error(f"Registration error: {e}")
-                st.info("Using manual registration form as fallback")
-                render_manual_registration_form()
-                
-        except Exception as e:
-            st.error(f"Registration widget error: {e}")
-            st.info("Using manual registration form as fallback")
-            render_manual_registration_form()
+        # Use manual registration form (more reliable and customizable)
+        st.markdown("#### 📝 Registration Form")
+        st.info("🛡️ Secure registration - no captcha required")
+        render_manual_registration_form()
         
         st.markdown('</div>', unsafe_allow_html=True)
     
