@@ -471,13 +471,13 @@ def render_registration_section():
             for email in config['preauthorized']:
                 st.write(f"• {email}")
         
-        # Registration widget with maximum compatibility
+        # Registration widget with captcha disabled
         try:
             st.markdown("#### 📝 Registration Form")
             
-            # Try with proper keyword arguments
+            # Try with captcha disabled
             try:
-                if authenticator.register_user(location='main'):
+                if authenticator.register_user(location='main', captcha=False):
                     st.success('✅ User registered successfully!')
                     if save_config():
                         st.success("Configuration updated!")
