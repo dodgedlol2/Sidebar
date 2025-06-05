@@ -370,14 +370,27 @@ def show_authentication_page():
         sac.TabsItem(label='Password Help', icon='question-circle'),
     ], index=0, key='auth_tabs')
     
+    # Initialize return values
+    name = None
+    authentication_status = None
+    username = None
+    
     if auth_tabs == 'Login':
-        render_login_section()
+        name, authentication_status, username = render_login_section()
     elif auth_tabs == 'Register':
         render_registration_section()
     elif auth_tabs == 'Guest Login':
-        render_guest_login_section()
+        name, authentication_status, username = render_guest_login_section()
     else:  # Password Help
         render_password_help_section()
+    
+    # If no authentication happened, get current session state
+    if authentication_status is None:
+        name = st.session_state.get('name')
+        authentication_status = st.session_state.get('authentication_status')
+        username = st.session_state.get('username')
+    
+    return name, authentication_status, username
 
 def render_login_section():
     """Render main login section"""
@@ -480,10 +493,18 @@ def render_registration_section():
             st.error(f"Registration error: {e}")
         
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Return None values since registration doesn't log in automatically
+    return None, None, None
 
 def render_guest_login_section():
     """Render guest login section"""
     col1, col2, col3 = st.columns([1, 2, 1])
+    
+    # Initialize return values
+    name = None
+    authentication_status = None
+    username = None
     
     with col2:
         st.markdown('<div class="auth-container">', unsafe_allow_html=True)
@@ -498,19 +519,6 @@ def render_guest_login_section():
             "Microsoft OAuth"
         ], index=0, key='guest_provider')
         
-        oauth2_config = {
-            'Google': {
-                'client_id': 'your_google_client_id',
-                'client_secret': 'your_google_client_secret',
-                'server_metadata_url': 'https://accounts.google.com/.well-known/openid_configuration'
-            },
-            'Microsoft': {
-                'client_id': 'your_microsoft_client_id',
-                'client_secret': 'your_microsoft_client_secret',
-                'server_metadata_url': 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration'
-            }
-        }
-        
         try:
             if guest_provider == "Google OAuth":
                 if st.button("🔐 Login with Google", type="primary", use_container_width=True):
@@ -519,7 +527,9 @@ def render_guest_login_section():
                     st.session_state['authentication_status'] = True
                     st.session_state['name'] = 'Guest User'
                     st.session_state['username'] = 'guest_google'
-                    st.rerun()
+                    name = 'Guest User'
+                    authentication_status = True
+                    username = 'guest_google'
             else:
                 if st.button("🔐 Login with Microsoft", type="primary", use_container_width=True):
                     # Demo OAuth - in production you'd configure real OAuth
@@ -527,7 +537,9 @@ def render_guest_login_section():
                     st.session_state['authentication_status'] = True
                     st.session_state['name'] = 'Guest User'
                     st.session_state['username'] = 'guest_microsoft'
-                    st.rerun()
+                    name = 'Guest User'
+                    authentication_status = True
+                    username = 'guest_microsoft'
                     
         except Exception as e:
             st.error(f"Guest login error: {e}")
@@ -540,6 +552,8 @@ def render_guest_login_section():
         st.write("• 🚫 No data export")
         
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    return name, authentication_status, username
 
 def render_password_help_section():
     """Render password help section"""
@@ -625,6 +639,9 @@ def render_password_help_section():
                 st.error(f"Password recovery error: {e}")
         
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Return None values since password help doesn't log in
+    return None, None, None
 
 def show_main_app(name, username):
     """Enhanced main application with user management"""
