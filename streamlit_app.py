@@ -123,11 +123,14 @@ def add_new_user_to_config(username, email, first_name, last_name, password, sub
 
 def update_user_subscription_in_config(username, new_subscription):
     """Update user subscription in session state"""
+    global config  # Move global declaration to the top
+    
     if 'config' not in st.session_state:
         st.session_state.config = get_auth_config()
     
     if username in st.session_state.config['credentials']['usernames']:
         st.session_state.config['credentials']['usernames'][username]['subscription'] = new_subscription
+        config = st.session_state.config  # Update global config
         return True
     return False
 
@@ -150,6 +153,8 @@ authenticator = stauth.Authenticate(
 # Save config function - Streamlit Cloud version
 def save_config():
     """Save configuration changes to session state (Streamlit Cloud compatible)"""
+    global config  # Move global declaration to the top
+    
     try:
         # In Streamlit Cloud, we save to session state since we can't write files
         # In production with persistent storage, you'd write to a database or file
@@ -157,7 +162,6 @@ def save_config():
         # For demo purposes, we just update the session state
         if 'config' in st.session_state:
             # Update the global config variable
-            global config
             config = st.session_state.config
             
             # Show success message
@@ -171,6 +175,8 @@ def save_config():
 # Admin panel for user management (Streamlit Cloud compatible)
 def render_admin_panel():
     """Admin panel for user management - works in Streamlit Cloud"""
+    global config  # Add global declaration
+    
     if st.session_state.get('username') != 'admin':
         st.error("🔒 Access denied. Admin only.")
         return
@@ -891,6 +897,8 @@ def show_main_app(name, username):
 
 def render_user_profile(name, username):
     """Enhanced user profile with update capabilities"""
+    global config  # Add global declaration
+    
     st.title("👤 User Profile & Settings")
     
     subscription_level = get_user_subscription(username)
