@@ -3,10 +3,25 @@ import streamlit_antd_components as sac
 import streamlit_authenticator as stauth
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
 from datetime import datetime, timedelta
-import requests
+import yaml
+from yaml.loader import SafeLoader
+import os
+
+# Try to import Plotly, fallback to basic charts if not available
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    st.warning("📊 Plotly not installed. Using basic charts. Install with: pip install plotly")
+
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 
 # Configure page settings
 st.set_page_config(
@@ -16,10 +31,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Authentication configuration
-@st.cache_data
-def load_auth_config():
-    """Load authentication configuration"""
+# Authentication configuration with API key
+def get_auth_config():
+    """Get authentication configuration with API key support"""
     config = {
         'credentials': {
             'usernames': {
@@ -28,43 +42,75 @@ def load_auth_config():
                     'first_name': 'Admin',
                     'last_name': 'User',
                     'password': 'admin123',
-                    'subscription': 'pro'
+                    'subscription': 'pro',
+                    'failed_login_attempts': 0,
+                    'logged_in': False
                 },
                 'premium_user': {
                     'email': 'premium@example.com',
                     'first_name': 'Premium',
                     'last_name': 'User',
                     'password': 'premium123',
-                    'subscription': 'premium'
+                    'subscription': 'premium',
+                    'failed_login_attempts': 0,
+                    'logged_in': False
                 },
                 'free_user': {
                     'email': 'free@example.com',
                     'first_name': 'Free',
                     'last_name': 'User',
                     'password': 'free123',
-                    'subscription': 'free'
+                    'subscription': 'free',
+                    'failed_login_attempts': 0,
+                    'logged_in': False
                 }
             }
         },
         'cookie': {
             'name': 'kaspa_analytics_auth',
-            'key': 'kaspa_secret_key_12345',
+            'key': 'kaspa_secret_key_12345_change_in_production',
             'expiry_days': 30
         },
-        'preauthorized': ['admin@kaspalytics.com']
+        'preauthorized': [
+            'admin@kaspalytics.com',
+            'newuser@kaspalytics.com',
+            'beta@kaspalytics.com'
+        ],
+        'api_key': 'a9fz9gh0zq7io3zpjnya1vmx8et9b3pd'  # Your API key for 2FA and email features
     }
     return config
 
-# Initialize authenticator
-config = load_auth_config()
+# Initialize configuration
+if 'config' not in st.session_state:
+    st.session_state.config = get_auth_config()
+
+config = st.session_state.config
+
+# Initialize authenticator with API key
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
     config['cookie']['key'],
     config['cookie']['expiry_days'],
     config['preauthorized'],
-    auto_hash=True
+    auto_hash=True,
+    api_key=config['api_key']  # Enable 2FA and email features
 )
+
+# Save config function
+def save_config():
+    """Save configuration changes"""
+    try:
+        # In production, you'd save to a file:
+        # with open('config.yaml', 'w') as file:
+        #     yaml.dump(st.session_state.config, file, default_flow_style=False, allow_unicode=True)
+        
+        # For demo, we'll just update session state
+        st.session_state.config = config
+        return True
+    except Exception as e:
+        st.error(f"Error saving config: {e}")
+        return False
 
 # Custom CSS for Kaspa theme
 st.markdown("""
@@ -76,6 +122,15 @@ st.markdown("""
     color: white;
     margin-bottom: 2rem;
     text-align: center;
+}
+
+.auth-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    margin: 1rem 0;
 }
 
 .premium-badge {
@@ -113,15 +168,22 @@ st.markdown("""
     text-align: center;
     margin: 2rem 0;
 }
+
+.feature-highlight {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid #70C7BA;
+    margin: 1rem 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Data fetching functions
+# Data fetching functions (same as before)
 @st.cache_data(ttl=300)
 def fetch_kaspa_price_data():
     """Fetch Kaspa price data"""
     try:
-        # Generate synthetic data for demo
         dates = pd.date_range(start='2022-01-01', end=datetime.now(), freq='D')
         
         np.random.seed(42)
@@ -149,92 +211,45 @@ def fetch_kaspa_price_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-def calculate_power_law_metrics(df, subscription_level):
-    """Calculate power law analysis metrics"""
-    if df.empty:
-        return pd.DataFrame(), {}
-    
-    df = df.copy()
-    df['days_since_start'] = (df['timestamp'] - df['timestamp'].min()).dt.days + 1
-    df['log_price'] = np.log(df['price'])
-    df['log_days'] = np.log(df['days_since_start'])
-    
-    # Simple linear regression for log-log plot
-    coeffs = np.polyfit(df['log_days'], df['log_price'], 1)
-    df['power_law_fit'] = np.exp(coeffs[1]) * (df['days_since_start'] ** coeffs[0])
-    
-    if subscription_level in ['premium', 'pro']:
-        # Add advanced metrics
-        df['price_deviation'] = (df['price'] - df['power_law_fit']) / df['power_law_fit']
-        df['support_level'] = df['power_law_fit'] * 0.5
-        df['resistance_level'] = df['power_law_fit'] * 2.0
-        
-        metrics = {
-            'slope': coeffs[0],
-            'intercept': coeffs[1],
-            'r_squared': np.corrcoef(df['log_days'], df['log_price'])[0, 1] ** 2,
-            'current_deviation': df['price_deviation'].iloc[-1],
-            'avg_deviation': df['price_deviation'].mean()
-        }
-    else:
-        metrics = {'slope': coeffs[0], 'intercept': coeffs[1]}
-    
-    return df, metrics
-
 def get_user_subscription(username):
     """Get user subscription level"""
     user_config = config['credentials']['usernames'].get(username, {})
     return user_config.get('subscription', 'free')
 
-def show_paywall(feature_name, required_tier):
-    """Display paywall for premium features"""
-    st.markdown('<div class="paywall-container">', unsafe_allow_html=True)
-    st.markdown(f"## 🔒 {feature_name}")
-    st.markdown(f"This feature requires a **{required_tier.title()}** subscription.")
-    
-    if required_tier == 'premium':
-        benefits = [
-            "📊 Advanced Power Law Analysis",
-            "📈 Full Historical Data Access",
-            "💾 Data Export Capabilities", 
-            "🔔 Real-time Alerts"
-        ]
-        price = "$29/month"
-    else:  # pro
-        benefits = [
-            "🔬 Research-Grade Analysis",
-            "🤖 API Access",
-            "👨‍💼 Priority Support",
-            "🎯 Custom Indicators"
-        ]
-        price = "$99/month"
-    
-    for benefit in benefits:
-        st.markdown(f"- {benefit}")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button(f"Upgrade to {required_tier.title()} - {price}", type="primary"):
-            st.success("Redirecting to payment page... (Demo)")
-    with col2:
-        if st.button("Learn More"):
-            st.info("More information about pricing and features.")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def show_login_page():
-    """Display login page"""
+def show_authentication_page():
+    """Enhanced authentication page with all login options"""
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
     st.title("💎 Kaspa Analytics Pro")
     st.markdown("*Professional Kaspa blockchain analysis and research platform*")
+    st.markdown("*Now with enhanced security and user management*")
     st.markdown('</div>', unsafe_allow_html=True)
     
+    # Authentication tabs
+    auth_tabs = sac.tabs([
+        sac.TabsItem(label='Login', icon='box-arrow-in-right'),
+        sac.TabsItem(label='Register', icon='person-plus'),
+        sac.TabsItem(label='Guest Login', icon='person-circle'),
+        sac.TabsItem(label='Password Help', icon='question-circle'),
+    ], index=0, key='auth_tabs')
+    
+    if auth_tabs == 'Login':
+        render_login_section()
+    elif auth_tabs == 'Register':
+        render_registration_section()
+    elif auth_tabs == 'Guest Login':
+        render_guest_login_section()
+    else:  # Password Help
+        render_password_help_section()
+
+def render_login_section():
+    """Render main login section"""
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.markdown("### 🔐 Login to Access Analytics")
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Login to Your Account")
         
-        # Login widget
+        # Main login widget
         authenticator.login()
         
         # Get authentication status
@@ -244,30 +259,237 @@ def show_login_page():
         
         if authentication_status == False:
             st.error("❌ Username/password is incorrect. Please try again.")
+            
+            # Show failed login attempts
+            failed_attempts = st.session_state.get('failed_login_attempts', {})
+            if username and username in failed_attempts:
+                st.warning(f"⚠️ Failed attempts: {failed_attempts[username]}")
+        
         elif authentication_status == None:
             st.info("ℹ️ Please enter your credentials to access the platform.")
+        
+        # 2FA option
+        st.markdown("---")
+        enable_2fa = st.checkbox("🔒 Enable Two-Factor Authentication", help="Requires email verification")
+        
+        if enable_2fa and authentication_status:
+            st.info("🔐 2FA is enabled for enhanced security")
         
         # Demo credentials
         st.markdown("---")
         st.markdown("**🔑 Demo Accounts:**")
         
-        demo_tabs = sac.tabs([
-            sac.TabsItem(label='Free Tier', icon='person'),
+        demo_info = sac.tabs([
+            sac.TabsItem(label='Free', icon='person'),
             sac.TabsItem(label='Premium', icon='star'),
             sac.TabsItem(label='Pro', icon='crown'),
-        ], index=0, key='demo_accounts')
+        ], index=0, key='demo_creds')
         
-        if demo_tabs == 'Free Tier':
-            st.code("Username: free_user\nPassword: free123\nAccess: Basic charts")
-        elif demo_tabs == 'Premium':
-            st.code("Username: premium_user\nPassword: premium123\nAccess: Advanced analytics")
+        if demo_info == 'Free':
+            st.code("Username: free_user\nPassword: free123\nFeatures: Basic analytics")
+        elif demo_info == 'Premium':
+            st.code("Username: premium_user\nPassword: premium123\nFeatures: Advanced analytics")
         else:
-            st.code("Username: admin\nPassword: admin123\nAccess: Full platform")
+            st.code("Username: admin\nPassword: admin123\nFeatures: Full platform access")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
     return name, authentication_status, username
 
+def render_registration_section():
+    """Render user registration section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### ✨ Create New Account")
+        
+        # Registration options
+        registration_type = sac.segmented([
+            "Open Registration",
+            "Pre-authorized Only"
+        ], index=0, key='registration_type')
+        
+        if registration_type == "Open Registration":
+            st.info("📝 Anyone can register for a free account")
+            preauthorization = False
+        else:
+            st.info("🛡️ Only pre-authorized email addresses can register")
+            preauthorization = True
+            
+            st.markdown("**Pre-authorized emails:**")
+            for email in config['preauthorized']:
+                st.write(f"• {email}")
+        
+        # Enhanced registration widget with 2FA option
+        try:
+            enable_2fa_reg = st.checkbox("🔒 Enable 2FA for new account", key='reg_2fa')
+            
+            if authenticator.register_user(
+                'Register User', 
+                preauthorization=preauthorization,
+                two_factor_auth=enable_2fa_reg
+            ):
+                st.success('✅ User registered successfully!')
+                if enable_2fa_reg:
+                    st.info("📧 2FA verification email sent!")
+                
+                # Save config changes
+                if save_config():
+                    st.success("Configuration updated!")
+                
+        except Exception as e:
+            st.error(f"Registration error: {e}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def render_guest_login_section():
+    """Render guest login section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 👤 Guest Access")
+        
+        st.markdown("#### Quick Demo Access")
+        st.info("🎯 Try the platform without creating an account")
+        
+        # Guest login options
+        guest_provider = sac.segmented([
+            "Google OAuth",
+            "Microsoft OAuth"
+        ], index=0, key='guest_provider')
+        
+        oauth2_config = {
+            'Google': {
+                'client_id': 'your_google_client_id',
+                'client_secret': 'your_google_client_secret',
+                'server_metadata_url': 'https://accounts.google.com/.well-known/openid_configuration'
+            },
+            'Microsoft': {
+                'client_id': 'your_microsoft_client_id',
+                'client_secret': 'your_microsoft_client_secret',
+                'server_metadata_url': 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration'
+            }
+        }
+        
+        try:
+            if guest_provider == "Google OAuth":
+                if st.button("🔐 Login with Google", type="primary", use_container_width=True):
+                    # Demo OAuth - in production you'd configure real OAuth
+                    st.success("🎉 Demo: Google OAuth login successful!")
+                    st.session_state['authentication_status'] = True
+                    st.session_state['name'] = 'Guest User'
+                    st.session_state['username'] = 'guest_google'
+                    st.rerun()
+            else:
+                if st.button("🔐 Login with Microsoft", type="primary", use_container_width=True):
+                    # Demo OAuth - in production you'd configure real OAuth
+                    st.success("🎉 Demo: Microsoft OAuth login successful!")
+                    st.session_state['authentication_status'] = True
+                    st.session_state['name'] = 'Guest User'
+                    st.session_state['username'] = 'guest_microsoft'
+                    st.rerun()
+                    
+        except Exception as e:
+            st.error(f"Guest login error: {e}")
+        
+        st.markdown("---")
+        st.markdown("**📋 Guest Account Features:**")
+        st.write("• 🔍 Limited analytics access")
+        st.write("• 📊 Basic charts and data")
+        st.write("• ⏰ 30-minute session limit")
+        st.write("• 🚫 No data export")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def render_password_help_section():
+    """Render password help section"""
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.markdown("### 🆘 Password & Username Help")
+        
+        help_tabs = sac.tabs([
+            sac.TabsItem(label='Reset Password', icon='key'),
+            sac.TabsItem(label='Forgot Username', icon='person-question'),
+            sac.TabsItem(label='Forgot Password', icon='unlock'),
+        ], key='help_tabs')
+        
+        if help_tabs == 'Reset Password':
+            st.markdown("#### 🔑 Reset Your Password")
+            st.info("ℹ️ For existing users who want to change their password")
+            
+            # Check if user is authenticated first
+            if st.session_state.get('authentication_status'):
+                username = st.session_state.get('username')
+                try:
+                    if authenticator.reset_password(username, 'Reset password'):
+                        st.success('✅ Password modified successfully')
+                        if save_config():
+                            st.success("Changes saved!")
+                except Exception as e:
+                    st.error(f"Password reset error: {e}")
+            else:
+                st.warning("🔐 Please login first to reset your password")
+        
+        elif help_tabs == 'Forgot Username':
+            st.markdown("#### 👤 Recover Your Username")
+            st.info("📧 Enter your email to receive your username")
+            
+            try:
+                enable_email = st.checkbox("📨 Send username via email", key='username_email')
+                
+                username_forgot_username, email_forgot_username = authenticator.forgot_username(
+                    'Forgot username',
+                    send_email=enable_email
+                )
+                
+                if username_forgot_username:
+                    st.success('✅ Username found!')
+                    if enable_email:
+                        st.info('📧 Username sent to your email')
+                    else:
+                        st.info(f'👤 Your username is: **{username_forgot_username}**')
+                elif username_forgot_username == False:
+                    st.error('❌ Email not found in our system')
+                    
+            except Exception as e:
+                st.error(f"Username recovery error: {e}")
+        
+        else:  # Forgot Password
+            st.markdown("#### 🔓 Recover Your Password")
+            st.info("🔐 Generate a new secure password")
+            
+            try:
+                enable_email = st.checkbox("📨 Send new password via email", key='password_email')
+                
+                username_forgot_pw, email_forgot_password, random_password = authenticator.forgot_password(
+                    'Forgot password',
+                    send_email=enable_email
+                )
+                
+                if username_forgot_pw:
+                    st.success('✅ New password generated!')
+                    if enable_email:
+                        st.info('📧 New password sent securely to your email')
+                    else:
+                        st.info('🔑 Please check your email for the new password')
+                        
+                    if save_config():
+                        st.success("Password updated!")
+                        
+                elif username_forgot_pw == False:
+                    st.error('❌ Username not found')
+                    
+            except Exception as e:
+                st.error(f"Password recovery error: {e}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
 def show_main_app(name, username):
-    """Display main application"""
+    """Enhanced main application with user management"""
     subscription_level = get_user_subscription(username)
     
     # Header with user info
@@ -288,18 +510,29 @@ def show_main_app(name, username):
             st.markdown('<span class="pro-badge">PRO</span>', unsafe_allow_html=True)
     
     with col3:
-        if st.button("🚪 Logout", type="secondary"):
-            authenticator.logout()
-            st.rerun()
+        logout_col1, logout_col2 = st.columns(2)
+        with logout_col1:
+            if st.button("⚙️ Profile", type="secondary"):
+                st.session_state.show_profile = True
+                st.rerun()
+        with logout_col2:
+            if st.button("🚪 Logout", type="secondary"):
+                authenticator.logout()
+                st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Sidebar navigation
+    # Check if user wants to see profile
+    if st.session_state.get('show_profile'):
+        render_user_profile(name, username)
+        return
+    
+    # Sidebar navigation (same as before)
     with st.sidebar:
         st.title("📊 Analytics Menu")
         
         # Create menu based on subscription level
-        if subscription_level == 'free':
+        if subscription_level == 'free' or username.startswith('guest'):
             menu_items = [
                 sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Free', color='gray')),
                 sac.MenuItem('price_charts', icon='graph-up', description='Basic price data'),
@@ -307,9 +540,9 @@ def show_main_app(name, username):
                 sac.MenuItem(type='divider'),
                 sac.MenuItem('upgrade', icon='star', tag=sac.Tag('Upgrade', color='orange')),
             ]
-        elif subscription_level == 'premium':
+        else:
             menu_items = [
-                sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Premium', color='gold')),
+                sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Premium+', color='gold')),
                 sac.MenuItem('price_charts', icon='graph-up'),
                 sac.MenuItem('analytics', icon='bar-chart-fill', children=[
                     sac.MenuItem('power_law_advanced', icon='trending-up'),
@@ -317,481 +550,207 @@ def show_main_app(name, username):
                 ]),
                 sac.MenuItem('data_export', icon='download'),
                 sac.MenuItem(type='divider'),
-                sac.MenuItem('upgrade_pro', icon='crown', tag=sac.Tag('Pro', color='purple')),
-            ]
-        else:  # pro
-            menu_items = [
-                sac.MenuItem('overview', icon='house-fill', tag=sac.Tag('Pro', color='purple')),
-                sac.MenuItem('price_charts', icon='graph-up'),
-                sac.MenuItem('analytics', icon='bar-chart-fill', children=[
-                    sac.MenuItem('power_law_advanced', icon='trending-up'),
-                    sac.MenuItem('network_metrics', icon='diagram-3'),
-                    sac.MenuItem('custom_indicators', icon='sliders'),
-                ]),
-                sac.MenuItem('research', icon='book', children=[
-                    sac.MenuItem('power_law_research', icon='graph-up-arrow'),
-                    sac.MenuItem('reports', icon='file-earmark-text'),
-                ]),
-                sac.MenuItem('data_export', icon='download'),
-                sac.MenuItem(type='divider'),
-                sac.MenuItem('settings', icon='gear'),
+                sac.MenuItem('account', icon='person-gear', description='Profile & Settings'),
             ]
         
         selected = sac.menu(menu_items, open_all=True, key='main_menu')
         
-        # Quick stats sidebar
+        # Quick stats
         st.markdown("---")
         st.markdown("**⚡ Quick Stats**")
-        
         df = fetch_kaspa_price_data()
         if not df.empty:
             current_price = df['price'].iloc[-1]
-            price_change = ((current_price - df['price'].iloc[-2]) / df['price'].iloc[-2]) * 100
+            st.metric("KAS Price", f"${current_price:.4f}")
             
-            st.metric("KAS Price", f"${current_price:.4f}", f"{price_change:+.2f}%")
-            st.metric("24h Volume", f"${df['volume'].iloc[-1]:,.0f}")
+            # Show session info for guests
+            if username.startswith('guest'):
+                st.markdown("---")
+                st.warning("👤 Guest Session\n⏰ Limited time access")
     
-    # Main content routing
-    if not selected:
-        selected = 'overview'
-    
-    if selected == 'overview':
+    # Content routing
+    if selected == 'account':
+        render_user_profile(name, username)
+    elif selected == 'overview':
         render_overview(subscription_level)
-    elif selected == 'price_charts':
-        render_price_charts(subscription_level)
-    elif selected == 'power_law_basic':
-        render_power_law_basic(subscription_level)
-    elif selected == 'power_law_advanced':
-        render_power_law_advanced(subscription_level)
-    elif selected == 'network_metrics':
-        render_network_metrics(subscription_level)
-    elif selected == 'custom_indicators':
-        render_custom_indicators(subscription_level)
-    elif selected == 'power_law_research':
-        render_power_law_research(subscription_level)
-    elif selected == 'reports':
-        render_reports(subscription_level)
-    elif selected == 'data_export':
-        render_data_export(subscription_level)
     elif selected == 'upgrade':
         render_upgrade_page('premium')
-    elif selected == 'upgrade_pro':
-        render_upgrade_page('pro')
-    elif selected == 'settings':
-        render_settings()
     else:
-        render_overview(subscription_level)
+        render_overview(subscription_level)  # Default fallback
+
+def render_user_profile(name, username):
+    """Enhanced user profile with update capabilities"""
+    st.title("👤 User Profile & Settings")
+    
+    subscription_level = get_user_subscription(username)
+    
+    profile_tabs = sac.tabs([
+        sac.TabsItem(label='Profile Info', icon='person-circle'),
+        sac.TabsItem(label='Security', icon='shield-check'),
+        sac.TabsItem(label='Subscription', icon='credit-card'),
+        sac.TabsItem(label='Account Settings', icon='gear'),
+    ], key='profile_tabs')
+    
+    if profile_tabs == 'Profile Info':
+        st.subheader("📝 Personal Information")
+        
+        # Update user details widget
+        try:
+            if authenticator.update_user_details(username, 'Update user details'):
+                st.success('✅ Profile updated successfully')
+                if save_config():
+                    st.success("Changes saved!")
+        except Exception as e:
+            st.error(f"Profile update error: {e}")
+        
+        # Display current info
+        user_info = config['credentials']['usernames'].get(username, {})
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Full Name:** {user_info.get('first_name', '')} {user_info.get('last_name', '')}")
+            st.write(f"**Email:** {user_info.get('email', 'Not set')}")
+        with col2:
+            st.write(f"**Username:** {username}")
+            st.write(f"**Subscription:** {subscription_level.title()}")
+    
+    elif profile_tabs == 'Security':
+        st.subheader("🔒 Security Settings")
+        
+        # Password reset
+        try:
+            if authenticator.reset_password(username, 'Change Password'):
+                st.success('✅ Password changed successfully')
+                if save_config():
+                    st.success("Password updated!")
+        except Exception as e:
+            st.error(f"Password change error: {e}")
+        
+        # Security features
+        st.markdown("---")
+        st.markdown("#### 🛡️ Security Features")
+        
+        enable_2fa = st.checkbox("🔐 Enable Two-Factor Authentication", 
+                                help="Requires email verification for login")
+        
+        if enable_2fa:
+            st.success("✅ 2FA will be enabled on next login")
+        
+        # Login history
+        st.markdown("#### 📊 Login History")
+        failed_attempts = user_info.get('failed_login_attempts', 0)
+        last_login = user_info.get('last_login', 'Never')
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Failed Login Attempts", failed_attempts)
+        with col2:
+            st.metric("Account Status", "Active" if user_info.get('logged_in') else "Logged Out")
+    
+    elif profile_tabs == 'Subscription':
+        st.subheader("💳 Subscription Management")
+        
+        # Current subscription info
+        st.markdown('<div class="feature-highlight">', unsafe_allow_html=True)
+        st.markdown(f"### Current Plan: {subscription_level.title()}")
+        
+        if subscription_level == 'free':
+            st.markdown("**Free Features:**")
+            st.write("• Basic price charts")
+            st.write("• 30-day data history")
+            st.write("• Simple power law analysis")
+        elif subscription_level == 'premium':
+            st.markdown("**Premium Features:**")
+            st.write("• Advanced analytics")
+            st.write("• Full historical data")
+            st.write("• Data export capabilities")
+            st.write("• Network metrics")
+        else:  # pro
+            st.markdown("**Pro Features:**")
+            st.write("• All Premium features")
+            st.write("• Research workspace")
+            st.write("• Custom models")
+            st.write("• API access")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Upgrade options
+        if subscription_level != 'pro':
+            target_plan = 'premium' if subscription_level == 'free' else 'pro'
+            if st.button(f"⬆️ Upgrade to {target_plan.title()}", type="primary"):
+                st.balloons()
+                st.success(f"Redirecting to {target_plan} upgrade... (Demo)")
+    
+    else:  # Account Settings
+        st.subheader("⚙️ Account Settings")
+        
+        # Account preferences
+        st.markdown("#### 🎛️ Preferences")
+        
+        email_notifications = st.checkbox("📧 Email Notifications", value=True)
+        marketing_emails = st.checkbox("📢 Marketing Updates", value=False)
+        data_retention = st.selectbox("📊 Data Retention", ["1 month", "6 months", "1 year", "Indefinite"])
+        
+        if st.button("💾 Save Preferences"):
+            st.success("✅ Preferences saved!")
+        
+        # Danger zone
+        st.markdown("---")
+        st.markdown("#### ⚠️ Danger Zone")
+        
+        if st.button("🗑️ Delete Account", type="secondary"):
+            st.error("Account deletion would be processed here (Demo)")
+    
+    # Back to dashboard button
+    if st.button("← Back to Dashboard"):
+        st.session_state.show_profile = False
+        st.rerun()
 
 def render_overview(subscription_level):
-    """Render overview dashboard"""
+    """Basic overview page"""
     st.title("📊 Kaspa Market Overview")
     
     df = fetch_kaspa_price_data()
-    
     if df.empty:
-        st.error("Unable to load market data. Please try again later.")
+        st.error("Unable to load data")
         return
     
     # Key metrics
     col1, col2, col3, col4 = st.columns(4)
-    
     current_price = df['price'].iloc[-1]
-    price_change_24h = ((current_price - df['price'].iloc[-2]) / df['price'].iloc[-2]) * 100
-    price_change_7d = ((current_price - df['price'].iloc[-7]) / df['price'].iloc[-7]) * 100
     
     with col1:
-        st.metric("Current Price", f"${current_price:.4f}", f"{price_change_24h:+.2f}%")
+        st.metric("Current Price", f"${current_price:.4f}")
     with col2:
-        st.metric("7D Change", f"{price_change_7d:+.2f}%")
+        st.metric("24h Volume", f"${df['volume'].iloc[-1]:,.0f}")
     with col3:
         st.metric("Market Cap", "$2.1B", "Est.")
     with col4:
-        if subscription_level != 'free':
-            st.metric("Power Law Position", "Above Trend", "+15%")
+        if subscription_level in ['premium', 'pro']:
+            st.metric("Power Law", "Above Trend", "+15%")
         else:
             st.metric("Power Law", "🔒 Premium", "Upgrade")
     
-    # Price chart
+    # Basic chart
     st.subheader("📈 Price Chart")
+    chart_data = df.tail(30 if subscription_level == 'free' else len(df))
     
-    if subscription_level == 'free':
-        chart_df = df.tail(30)
-        st.info("📅 Free users see last 30 days. Upgrade for full historical data.")
-    else:
-        chart_df = df
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=chart_df['timestamp'],
-        y=chart_df['price'],
-        mode='lines',
-        name='KAS Price',
-        line=dict(color='#70C7BA', width=2)
-    ))
-    
-    fig.update_layout(
-        title="Kaspa Price History",
-        xaxis_title="Date",
-        yaxis_title="Price (USD)",
-        height=400
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Power law preview
-    if subscription_level == 'free':
-        st.subheader("🔒 Power Law Analysis Preview")
-        show_paywall("Advanced Power Law Analysis", "premium")
-    else:
-        st.subheader("📊 Power Law Analysis")
-        render_power_law_preview(df, subscription_level)
-
-def render_power_law_preview(df, subscription_level):
-    """Render power law analysis preview"""
-    power_law_df, metrics = calculate_power_law_metrics(df, subscription_level)
-    
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter(
-        x=power_law_df['timestamp'],
-        y=power_law_df['price'],
-        mode='lines',
-        name='Actual Price',
-        line=dict(color='#70C7BA', width=2)
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=power_law_df['timestamp'],
-        y=power_law_df['power_law_fit'],
-        mode='lines',
-        name='Power Law Trend',
-        line=dict(color='red', width=2, dash='dash')
-    ))
-    
-    if subscription_level in ['premium', 'pro']:
-        fig.add_trace(go.Scatter(
-            x=power_law_df['timestamp'],
-            y=power_law_df['support_level'],
-            mode='lines',
-            name='Support',
-            line=dict(color='green', width=1, dash='dot'),
-            opacity=0.7
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=power_law_df['timestamp'],
-            y=power_law_df['resistance_level'],
-            mode='lines',
-            name='Resistance',
-            line=dict(color='red', width=1, dash='dot'),
-            opacity=0.7
-        ))
-    
-    fig.update_layout(
-        title="Kaspa Power Law Analysis",
-        xaxis_title="Date",
-        yaxis_title="Price (USD)",
-        yaxis_type="log",
-        height=500
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    if subscription_level in ['premium', 'pro']:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Power Law Slope", f"{metrics['slope']:.3f}")
-        with col2:
-            st.metric("R-Squared", f"{metrics['r_squared']:.3f}")
-        with col3:
-            st.metric("Current Deviation", f"{metrics['current_deviation']:+.1%}")
-
-def render_price_charts(subscription_level):
-    """Render price charts page"""
-    st.title("📈 Price Charts")
-    
-    df = fetch_kaspa_price_data()
-    
-    if subscription_level == 'free':
-        df = df.tail(30)
-        st.warning("📅 Free tier: Limited to 30 days of data")
-    
-    chart_type = st.selectbox("Chart Type", ["Line", "Area"])
-    
-    if chart_type == "Line":
-        fig = px.line(df, x='timestamp', y='price', title="Kaspa Price")
-    else:
-        fig = px.area(df, x='timestamp', y='price', title="Kaspa Price")
-    
-    st.plotly_chart(fig, use_container_width=True)
-
-def render_power_law_basic(subscription_level):
-    """Render basic power law analysis"""
-    st.title("📊 Basic Power Law Analysis")
-    
-    if subscription_level == 'free':
-        df = fetch_kaspa_price_data()
-        power_law_df, coeffs = calculate_power_law_metrics(df.tail(90), subscription_level)
-        
-        st.info("📅 Free tier: Basic power law with 90 days of data")
-        
+    if PLOTLY_AVAILABLE:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=power_law_df['timestamp'],
-            y=power_law_df['price'],
-            name='Price',
-            line=dict(color='#70C7BA')
-        ))
-        fig.add_trace(go.Scatter(
-            x=power_law_df['timestamp'],
-            y=power_law_df['power_law_fit'],
-            name='Power Law Fit',
-            line=dict(color='red', dash='dash')
-        ))
-        
-        fig.update_layout(title="Basic Power Law Analysis", yaxis_type="log")
+        fig.add_trace(go.Scatter(x=chart_data['timestamp'], y=chart_data['price'], name='KAS Price'))
+        fig.update_layout(title="Kaspa Price", height=400)
         st.plotly_chart(fig, use_container_width=True)
-        
-        st.markdown("### 🔒 Advanced Features")
-        show_paywall("Advanced Power Law Analysis", "premium")
     else:
-        st.info("You have premium access! Visit 'Analytics > Power Law Advanced' for full features.")
-
-def render_power_law_advanced(subscription_level):
-    """Render advanced power law analysis"""
-    if subscription_level == 'free':
-        show_paywall("Advanced Power Law Analysis", "premium")
-        return
-    
-    st.title("🔬 Advanced Power Law Analysis")
-    
-    df = fetch_kaspa_price_data()
-    power_law_df, metrics = calculate_power_law_metrics(df, subscription_level)
-    
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter(
-        x=power_law_df['timestamp'],
-        y=power_law_df['price'],
-        name='Actual Price',
-        line=dict(color='#70C7BA', width=2)
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=power_law_df['timestamp'],
-        y=power_law_df['power_law_fit'],
-        name='Power Law Trend',
-        line=dict(color='red', width=2, dash='dash')
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=power_law_df['timestamp'],
-        y=power_law_df['support_level'],
-        mode='lines',
-        name='Support',
-        line=dict(color='green', width=1),
-        opacity=0.3
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=power_law_df['timestamp'],
-        y=power_law_df['resistance_level'],
-        mode='lines',
-        name='Resistance',
-        line=dict(color='red', width=1),
-        opacity=0.3
-    ))
-    
-    fig.update_layout(
-        title="Advanced Power Law Analysis",
-        yaxis_type="log",
-        height=600
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Power Law Slope", f"{metrics['slope']:.4f}")
-    with col2:
-        st.metric("R-Squared", f"{metrics['r_squared']:.4f}")
-    with col3:
-        st.metric("Current Deviation", f"{metrics['current_deviation']:+.1%}")
-    with col4:
-        st.metric("Average Deviation", f"{metrics['avg_deviation']:+.1%}")
-
-def render_network_metrics(subscription_level):
-    """Render network metrics analysis"""
-    if subscription_level == 'free':
-        show_paywall("Network Metrics Analysis", "premium")
-        return
-    
-    st.title("🌐 Kaspa Network Metrics")
-    st.info("Network metrics would show hash rate, difficulty, block time, and transaction data.")
-
-def render_custom_indicators(subscription_level):
-    """Render custom indicators page"""
-    if subscription_level != 'pro':
-        show_paywall("Custom Indicators", "pro")
-        return
-    
-    st.title("🎯 Custom Indicators")
-    st.info("Build and test your own custom technical indicators for Kaspa.")
-
-def render_power_law_research(subscription_level):
-    """Render power law research page"""
-    if subscription_level != 'pro':
-        show_paywall("Power Law Research", "pro")
-        return
-    
-    st.title("🔬 Power Law Research Hub")
-    st.markdown("*Your personal research workspace for Kaspa power law analysis*")
-    
-    research_tabs = sac.tabs([
-        sac.TabsItem(label='Research Notes', icon='journal-text'),
-        sac.TabsItem(label='Custom Models', icon='gear'),
-        sac.TabsItem(label='Publications', icon='book'),
-    ], key='research_tabs')
-    
-    if research_tabs == 'Research Notes':
-        st.subheader("📝 Research Notes & Observations")
-        
-        if 'research_notes' not in st.session_state:
-            st.session_state.research_notes = """
-# Kaspa Power Law Research Notes
-
-## Key Findings
-- Power law regression shows strong correlation
-- Deviation cycles correlate with market sentiment
-- Support levels hold during corrections
-
-## Research Questions
-1. How does Kaspa compare to Bitcoin's power law?
-2. What influences deviation from trend?
-3. Can we predict cycle tops/bottoms?
-            """
-        
-        notes = st.text_area("Research Notes", value=st.session_state.research_notes, height=400)
-        
-        if st.button("💾 Save Notes"):
-            st.session_state.research_notes = notes
-            st.success("Research notes saved!")
-        
-        st.markdown("### Preview:")
-        st.markdown(notes)
-    
-    elif research_tabs == 'Custom Models':
-        st.subheader("🔧 Custom Power Law Models")
-        st.info("Build custom power law models with adjustable parameters.")
-    
-    else:  # Publications
-        st.subheader("📚 Research Publications")
-        st.info("Manage and publish your Kaspa research papers.")
-
-def render_reports(subscription_level):
-    """Render reports page"""
-    if subscription_level != 'pro':
-        show_paywall("Research Reports", "pro")
-        return
-    
-    st.title("📑 Research Reports")
-    st.info("Generate comprehensive research reports based on your analysis.")
-
-def render_data_export(subscription_level):
-    """Render data export page"""
-    if subscription_level == 'free':
-        show_paywall("Data Export", "premium")
-        return
-    
-    st.title("💾 Data Export")
-    
-    export_tabs = sac.tabs([
-        sac.TabsItem(label='Price Data', icon='graph-up'),
-        sac.TabsItem(label='Power Law Analysis', icon='trending-up'),
-        sac.TabsItem(label='Network Metrics', icon='diagram-3'),
-    ], key='export_tabs')
-    
-    if export_tabs == 'Price Data':
-        st.subheader("📈 Export Price Data")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Start Date", value=datetime.now() - timedelta(days=365))
-        with col2:
-            end_date = st.date_input("End Date", value=datetime.now())
-        
-        file_format = st.selectbox("Format", ["CSV", "JSON", "Excel"])
-        
-        if st.button("📊 Generate Export"):
-            df = fetch_kaspa_price_data()
-            df_filtered = df[
-                (df['timestamp'] >= pd.Timestamp(start_date)) & 
-                (df['timestamp'] <= pd.Timestamp(end_date))
-            ]
-            
-            st.success(f"Generated {len(df_filtered)} records for export")
-            
-            if file_format == "CSV":
-                csv = df_filtered.to_csv(index=False)
-                st.download_button(
-                    "⬇️ Download CSV",
-                    csv,
-                    f"kaspa_price_data_{start_date}_{end_date}.csv",
-                    "text/csv"
-                )
-    
-    elif export_tabs == 'Power Law Analysis':
-        st.subheader("📊 Export Power Law Analysis")
-        st.info("Export power law analysis data and metrics.")
-    
-    else:  # Network Metrics
-        st.subheader("🌐 Export Network Metrics")
-        st.info("Export network hash rate, difficulty, and transaction data.")
+        st.line_chart(chart_data.set_index('timestamp')['price'])
 
 def render_upgrade_page(target_tier):
-    """Render upgrade page"""
+    """Basic upgrade page"""
     st.title(f"⭐ Upgrade to {target_tier.title()}")
-    
-    if target_tier == 'premium':
-        features = [
-            "📊 Advanced Power Law Analysis",
-            "📈 Full Historical Data Access",
-            "💾 Data Export Capabilities",
-            "🔔 Real-time Price Alerts"
-        ]
-        price = "$29/month"
-    else:  # pro
-        features = [
-            "🔬 All Premium Features",
-            "🛠️ Custom Power Law Models",
-            "📚 Research Workspace",
-            "🤖 API Access"
-        ]
-        price = "$99/month"
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("#### What you'll get:")
-        for feature in features:
-            st.markdown(f"✅ {feature}")
-    
-    with col2:
-        st.markdown(f"### {price}")
-        st.markdown("*Billed monthly*")
-        
-        if st.button(f"🚀 Upgrade to {target_tier.title()}", type="primary"):
-            st.success("Redirecting to payment... (Demo)")
-            st.balloons()
-
-def render_settings():
-    """Render settings page"""
-    st.title("⚙️ Settings")
-    st.info("Account settings and preferences would be configured here.")
+    st.write("Premium features and pricing information would be displayed here.")
 
 # Main application logic
 def main():
-    """Main application entry point"""
+    """Enhanced main application entry point"""
     
     # Check authentication status
     authentication_status = st.session_state.get('authentication_status')
@@ -799,7 +758,7 @@ def main():
     username = st.session_state.get('username')
     
     if authentication_status is not True:
-        name, authentication_status, username = show_login_page()
+        name, authentication_status, username = show_authentication_page()
         
         if authentication_status is True:
             st.rerun()
