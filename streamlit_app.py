@@ -672,7 +672,22 @@ def show_main_app(name, username):
                 st.rerun()
         with logout_col2:
             if st.button("🚪 Logout", type="secondary"):
-                authenticator.logout()
+                # Manual logout by clearing session state
+                for key in ['authentication_status', 'name', 'username', 'logout']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                # Also try the authenticator logout
+                try:
+                    authenticator.logout()
+                except:
+                    pass  # Continue with manual logout if authenticator fails
+                
+                # Clear any other auth-related session state
+                if 'show_profile' in st.session_state:
+                    del st.session_state['show_profile']
+                
+                # Force rerun to show login page
                 st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -726,6 +741,25 @@ def show_main_app(name, username):
             if username.startswith('guest'):
                 st.markdown("---")
                 st.warning("👤 Guest Session\n⏰ Limited time access")
+        
+        # Debug section (only for admin)
+        if username == 'admin':
+            st.markdown("---")
+            st.markdown("**🔧 Debug Info**")
+            if st.checkbox("Show Session State", key='debug_session'):
+                st.json({
+                    'authentication_status': st.session_state.get('authentication_status'),
+                    'name': st.session_state.get('name'),
+                    'username': st.session_state.get('username'),
+                    'show_profile': st.session_state.get('show_profile', False)
+                })
+            
+            if st.button("🔄 Force Logout (Debug)", key='debug_logout'):
+                # Clear ALL session state
+                keys_to_clear = list(st.session_state.keys())
+                for key in keys_to_clear:
+                    del st.session_state[key]
+                st.rerun()
     
     # Content routing
     if selected == 'account':
@@ -866,6 +900,22 @@ def render_user_profile(name, username):
     # Back to dashboard button
     if st.button("← Back to Dashboard"):
         st.session_state.show_profile = False
+        st.rerun()
+    
+    # Add logout button in profile as well
+    st.markdown("---")
+    if st.button("🚪 Logout from Profile", type="secondary", use_container_width=True):
+        # Manual logout by clearing session state
+        for key in ['authentication_status', 'name', 'username', 'logout', 'show_profile']:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        # Also try the authenticator logout
+        try:
+            authenticator.logout()
+        except:
+            pass
+        
         st.rerun()
 
 def render_overview(subscription_level):
